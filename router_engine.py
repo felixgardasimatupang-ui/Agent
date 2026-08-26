@@ -31,8 +31,8 @@ class NineRouterCoordinator:
         self.client = AsyncOpenAI(
             base_url=ROUTER_BASE_URL,
             api_key=api_key,
-            timeout=60.0,
-            max_retries=2,
+            timeout=30.0,
+            max_retries=1,
         )
         self.router_model = MODEL_COORDINATOR
         logger.info(
@@ -80,12 +80,16 @@ OUTPUT FORMAT:
 ]
 
 RULES:
+- CRITICAL: Each task MUST BE UNIQUE. No two agents should work on the same topic or deliverable.
 - Each instruction is SELF-CONTAINED. Agent has no context except this instruction.
 - Keep instructions SHORT and FOCUSED. 1-2 sentences per task. Specific deliverable.
 - DO NOT include the full original prompt in each task. Reference it briefly.
 - Each task should produce a CONCISE output (100-200 words or 50-100 lines of code).
 - Output EXACTLY {agent_count} items, numbered 1 to {agent_count}.
-- CRITICAL: Tasks must be completable within 30 seconds by the agent model."""
+- CRITICAL: Tasks must be completable within 30 seconds by the agent model.
+- AVOID DUPLICATION: If assigning multiple coding tasks, make each one tackle a DIFFERENT component or aspect.
+- CODING TASKS: ONE file only, max 30-40 lines. No multi-file projects. Keep examples minimal.
+- RESEARCH/ANALYSIS: Max 200 words. Focus on key points only. No lengthy essays."""
 
         try:
             response = await self.client.chat.completions.create(
@@ -95,7 +99,7 @@ RULES:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
-                max_tokens=8192,
+                max_tokens=2048,
                 stream=False,
             )
             raw = response.choices[0].message.content
