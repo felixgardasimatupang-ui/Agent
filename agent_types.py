@@ -126,14 +126,14 @@ def get_agent_profile(agent_type: AgentType) -> AgentProfile:
 def classify_task_type(task_description: str) -> AgentType:
     lower = task_description.lower()
 
-    if any(kw in lower for kw in ["search", "find online", "web", "latest", "current", "news"]):
+    if any(kw in lower for kw in ["research", "find", "investigate"]):
+        return AgentType.RESEARCHER
+    if any(kw in lower for kw in ["search online", "web search", "find online", "web", "latest", "current", "news"]):
         return AgentType.WEB_SEARCHER
     if any(kw in lower for kw in ["debug", "error", "fix", "bug", "issue", "crash"]):
         return AgentType.DEBUGGER
     if any(kw in lower for kw in ["sql", "query", "database", "schema"]):
         return AgentType.ANALYST
-    if any(kw in lower for kw in ["research", "find", "investigate"]):
-        return AgentType.RESEARCHER
     if any(kw in lower for kw in ["code", "function", "class", "implement", "write", "program", "create", "endpoint"]):
         return AgentType.CODER
     if any(kw in lower for kw in ["architect", "design", "system", "scale", "structure"]):
