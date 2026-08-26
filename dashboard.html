@@ -101,6 +101,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-s
 .logs .l.w { color: var(--yellow); }
 .logs .l.e { color: var(--red); }
 
+/* File upload */
+.file-label { cursor: pointer; }
+.file-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 7px 12px; border-radius: 6px; font-family: inherit; font-size: 0.8em; transition: all 0.15s; display: inline-block; }
+.file-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+.file-names { font-size: 0.75em; color: var(--gray); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Token stats */
+.token-badge { background: rgba(0,240,255,0.08); color: var(--cyan); padding: 3px 10px; border-radius: 4px; font-size: 0.75em; }
+
 @media (max-width: 768px) {
   .agent-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
   .header { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -128,10 +137,16 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-s
     </div>
     <div class="input-controls">
       <select id="strat">
+        <option value="merge" selected>Merge</option>
         <option value="best">Best</option>
         <option value="concatenate">Concatenate</option>
         <option value="vote">Vote</option>
       </select>
+      <label class="file-label" id="file-label">
+        <input type="file" id="file-input" multiple accept=".txt,.md,.py,.js,.json,.csv" style="display:none" onchange="handleFiles(this.files)">
+        <span class="file-btn">📎 Files</span>
+      </label>
+      <span class="file-names" id="file-names"></span>
       <button class="run-btn" id="run-btn" onclick="run()">RUN</button>
     </div>
   </div>
@@ -145,6 +160,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-s
         <span id="r-time"></span>
         <span id="r-agents"></span>
         <span id="r-strat"></span>
+        <span class="token-badge" id="r-tokens"></span>
       </div>
     </div>
     <div class="result-body" id="r-body"></div>
@@ -174,6 +190,28 @@ body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-s
 const API = location.origin;
 let ws, count = 0;
 const agents = {};
+let uploadedFiles = [];
+
+function handleFiles(files) {
+  uploadedFiles = Array.from(files);
+  const names = uploadedFiles.map(f => f.name).join(', ');
+  document.getElementById('file-names').textContent = names || '';
+}
+
+async function uploadFiles() {
+  if (!uploadedFiles.length) return [];
+  const results = [];
+  for (const file of uploadedFiles) {
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const r = await fetch(`${API}/v1/upload`, { method: 'POST', body: form });
+      const d = await r.json();
+      if (d.content) results.push({ name: file.name, content: d.content });
+    } catch(e) { log('Upload failed: ' + file.name, 'e'); }
+  }
+  return results;
+}
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
@@ -225,6 +263,7 @@ function showResult(d) {
   document.getElementById('r-time').textContent = (d.total_time||0).toFixed(1) + 's';
   document.getElementById('r-agents').textContent = (d.success_count||0) + '/' + ((d.success_count||0)+(d.failure_count||0));
   document.getElementById('r-strat').textContent = d.strategy || 'best';
+  document.getElementById('r-tokens').textContent = d.total_tokens ? d.total_tokens.toLocaleString() + ' tokens' : '';
 
   // Breakdown
   const ar = d.agent_results || [];
@@ -276,9 +315,13 @@ async function run() {
   render();
 
   try {
+    const files = await uploadFiles();
+    const body = { prompt, strategy: document.getElementById('strat').value, agents: 5 };
+    if (files.length) body.files = files.map(f => f.content);
+
     const r = await fetch(`${API}/v1/swarm/execute`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt, strategy: document.getElementById('strat').value, agents: 5 })
+      body: JSON.stringify(body)
     });
     const d = await r.json();
     if (d.task_id) showResult({...d, strategy: document.getElementById('strat').value});

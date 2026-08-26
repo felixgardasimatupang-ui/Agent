@@ -26,28 +26,28 @@ MODEL_WEB_SEARCH = "tavily/search"
 MODEL_EMBEDDING = "fastembed"
 
 # Agent type to model mapping
-# Strategy: murah (cheap/fast) for most, power (strong/slow) only for complex tasks
+# Strategy: power (strong) for coding/debugging, murah (cheap) for research/writing
 AGENT_MODEL_MAP = {
     # AgentType enum values (used by classify_task_type)
-    "coder": MODEL_SIMPLE,
+    "coder": MODEL_COMPLEX,
     "researcher": MODEL_SIMPLE,
     "analyst": MODEL_SIMPLE,
     "translator": MODEL_SIMPLE,
     "writer": MODEL_SIMPLE,
-    "debugger": MODEL_SIMPLE,
-    "architect": MODEL_SIMPLE,
+    "debugger": MODEL_COMPLEX,
+    "architect": MODEL_COMPLEX,
     "simple": MODEL_SIMPLE,
     "web_searcher": MODEL_WEB_SEARCH,
     # Aliases (from LLM output / task_type field)
-    "coding": MODEL_SIMPLE,
-    "code": MODEL_SIMPLE,
-    "debugging": MODEL_SIMPLE,
-    "debug": MODEL_SIMPLE,
+    "coding": MODEL_COMPLEX,
+    "code": MODEL_COMPLEX,
+    "debugging": MODEL_COMPLEX,
+    "debug": MODEL_COMPLEX,
     "researching": MODEL_SIMPLE,
     "research": MODEL_SIMPLE,
     "analyzing": MODEL_SIMPLE,
     "analysis": MODEL_SIMPLE,
-    "architecture": MODEL_SIMPLE,
+    "architecture": MODEL_COMPLEX,
     "writing": MODEL_SIMPLE,
     "translating": MODEL_SIMPLE,
     "translate": MODEL_SIMPLE,
