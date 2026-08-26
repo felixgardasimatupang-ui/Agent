@@ -103,23 +103,38 @@ WEB_SEARCH_TOOL = {
 }
 
 MODEL_PREFERENCES: Dict[AgentType, str] = {
-    AgentType.CODER: "murah",
-    AgentType.RESEARCHER: "murah",
-    AgentType.ANALYST: "murah",
-    AgentType.TRANSLATOR: "murah",
-    AgentType.WRITER: "murah",
-    AgentType.DEBUGGER: "murah",
-    AgentType.ARCHITECT: "murah",
+    AgentType.CODER: "power",
+    AgentType.RESEARCHER: "power",
+    AgentType.ANALYST: "power",
+    AgentType.TRANSLATOR: "power",
+    AgentType.WRITER: "power",
+    AgentType.DEBUGGER: "power",
+    AgentType.ARCHITECT: "power",
     AgentType.SIMPLE: "murah",
     AgentType.WEB_SEARCHER: "tavily/search",
 }
 
 
 def get_agent_profile(agent_type: AgentType) -> AgentProfile:
+    # Optimal settings per agent type
+    settings = {
+        AgentType.CODER:      {"max_tokens": 4096, "temperature": 0.2},   # deterministic code
+        AgentType.DEBUGGER:   {"max_tokens": 4096, "temperature": 0.1},   # precise fixes
+        AgentType.ARCHITECT:  {"max_tokens": 4096, "temperature": 0.4},   # balanced design
+        AgentType.RESEARCHER: {"max_tokens": 2048, "temperature": 0.5},   # balanced research
+        AgentType.ANALYST:    {"max_tokens": 2048, "temperature": 0.3},   # analytical
+        AgentType.WRITER:     {"max_tokens": 4096, "temperature": 0.7},   # creative writing
+        AgentType.TRANSLATOR: {"max_tokens": 2048, "temperature": 0.3},   # accurate translation
+        AgentType.SIMPLE:     {"max_tokens": 1024, "temperature": 0.5},   # quick answers
+        AgentType.WEB_SEARCHER: {"max_tokens": 2048, "temperature": 0.3}, # focused results
+    }
+    s = settings.get(agent_type, {"max_tokens": 1024, "temperature": 0.5})
     return AgentProfile(
         agent_type=agent_type,
         system_prompt=AGENT_PROMPTS[agent_type],
         preferred_model=MODEL_PREFERENCES[agent_type],
+        max_tokens=s["max_tokens"],
+        temperature=s["temperature"],
     )
 
 

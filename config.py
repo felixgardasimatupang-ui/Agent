@@ -26,14 +26,14 @@ MODEL_WEB_SEARCH = "tavily/search"
 MODEL_EMBEDDING = "fastembed"
 
 # Agent type to model mapping
-# Strategy: power (strong) for coding/debugging, murah (cheap) for research/writing
+# Strategy: power (strong) for ALL quality tasks, murah (cheap) only for coordinator/simple
 AGENT_MODEL_MAP = {
     # AgentType enum values (used by classify_task_type)
     "coder": MODEL_COMPLEX,
-    "researcher": MODEL_SIMPLE,
-    "analyst": MODEL_SIMPLE,
-    "translator": MODEL_SIMPLE,
-    "writer": MODEL_SIMPLE,
+    "researcher": MODEL_COMPLEX,
+    "analyst": MODEL_COMPLEX,
+    "translator": MODEL_COMPLEX,
+    "writer": MODEL_COMPLEX,
     "debugger": MODEL_COMPLEX,
     "architect": MODEL_COMPLEX,
     "simple": MODEL_SIMPLE,
@@ -43,14 +43,14 @@ AGENT_MODEL_MAP = {
     "code": MODEL_COMPLEX,
     "debugging": MODEL_COMPLEX,
     "debug": MODEL_COMPLEX,
-    "researching": MODEL_SIMPLE,
-    "research": MODEL_SIMPLE,
-    "analyzing": MODEL_SIMPLE,
-    "analysis": MODEL_SIMPLE,
+    "researching": MODEL_COMPLEX,
+    "research": MODEL_COMPLEX,
+    "analyzing": MODEL_COMPLEX,
+    "analysis": MODEL_COMPLEX,
     "architecture": MODEL_COMPLEX,
-    "writing": MODEL_SIMPLE,
-    "translating": MODEL_SIMPLE,
-    "translate": MODEL_SIMPLE,
+    "writing": MODEL_COMPLEX,
+    "translating": MODEL_COMPLEX,
+    "translate": MODEL_COMPLEX,
     "web_search": MODEL_WEB_SEARCH,
     "search": MODEL_WEB_SEARCH,
     "default": MODEL_SIMPLE,
@@ -66,10 +66,9 @@ ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".py", ".js", ".ts", ".json", ".csv"
 # ============================================================================
 # Swarm Configuration
 # ============================================================================
-DEFAULT_AGENT_COUNT = 10
-MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "10"))
-TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "30"))
-MAX_CONCURRENT_AGENTS = min(MAX_CONCURRENT_AGENTS, 8)  # cap at 8 for 9Router
+DEFAULT_AGENT_COUNT = int(os.environ.get("DEFAULT_AGENT_COUNT", "5"))
+MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "8"))
+TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "60"))
 
 # Retry configuration
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "2"))
