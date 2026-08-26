@@ -10,7 +10,7 @@ from pathlib import Path
 # 9Router Configuration
 # ============================================================================
 NINEROUTER_URL = os.environ.get("NINEROUTER_URL", "http://localhost:20128")
-NINEROUTER_KEY = os.environ.get("NINEROUTER_KEY", "")
+NINEROUTER_KEY = os.environ.get("NINEROUTER_KEY", "sk-e62fd80253ff2518-kyxcgd-469964b8")
 
 ROUTER_BASE_URL = f"{NINEROUTER_URL}/v1"
 ROUTER_API_KEY = NINEROUTER_KEY
