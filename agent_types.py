@@ -24,7 +24,7 @@ class AgentProfile:
     agent_type: AgentType
     system_prompt: str
     preferred_model: str
-    max_tokens: int = 2048
+    max_tokens: int = 1024
     temperature: float = 0.7
 
 
@@ -35,16 +35,16 @@ AGENT_PROMPTS: Dict[AgentType, str] = {
 - Follow best practices for the language/framework specified.""",
 
     AgentType.RESEARCHER: """You are a technical researcher. Provide CONCISE, ACTIONABLE findings directly.
+- MAX 200 words. Be brief and focused.
 - Output findings directly. No preamble.
 - Use bullet points for clarity.
-- Include code examples when relevant.
-- Focus on practical implementation details.""",
+- Include code examples when relevant.""",
 
     AgentType.ANALYST: """You are a data analyst. Provide DATA-DRIVEN insights directly.
+- MAX 200 words. Be brief and focused.
 - Output analysis directly. No "let me" preamble.
 - Use tables and bullet points.
-- Quantify where possible.
-- Include code snippets for data processing.""",
+- Quantify where possible.""",
 
     AgentType.TRANSLATOR: """You are an expert translator. Output the translation DIRECTLY.
 - Preserve original tone and style.
@@ -83,7 +83,7 @@ MODEL_PREFERENCES: Dict[AgentType, str] = {
     AgentType.TRANSLATOR: "murah",
     AgentType.WRITER: "murah",
     AgentType.DEBUGGER: "murah",
-    AgentType.ARCHITECT: "power",
+    AgentType.ARCHITECT: "murah",
     AgentType.SIMPLE: "murah",
 }
 

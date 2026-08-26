@@ -3,6 +3,7 @@ Swarm Manager - Core orchestration engine for the AI Swarm Orchestrator.
 Manages agent lifecycle, task execution, and result aggregation.
 """
 import asyncio
+import httpx
 from typing import List, Optional, Dict, Any
 from openai import AsyncOpenAI
 
@@ -13,6 +14,7 @@ from agent_types import (
     classify_task_type,
     MODEL_PREFERENCES,
 )
+from config import ROUTER_BASE_URL, ROUTER_API_KEY, TASK_TIMEOUT_SECONDS, MAX_RETRIES, RETRY_BASE_DELAY
 
 # Map coordinator task_type strings to AgentType enum values
 TASK_TYPE_TO_AGENT = {
@@ -62,7 +64,10 @@ class AgentWorker:
     ):
         self.task = task
         self.client = client
-        self.retry_config = retry_config or RetryConfig(max_retries=3)
+        self.retry_config = retry_config or RetryConfig(
+            max_retries=MAX_RETRIES,
+            base_delay=RETRY_BASE_DELAY,
+        )
         self.telemetry_cb = telemetry_cb
         self.profile = get_agent_profile(resolve_agent_type(task.agent_type))
 
@@ -298,19 +303,38 @@ class SwarmManager:
         tasks: List[Task],
         telemetry_cb=None,
     ) -> List[AgentResult]:
-        """Execute tasks in parallel with concurrency limiting."""
-        results = []
+        """Execute tasks in parallel with per-worker httpx clients."""
+        api_key = ROUTER_API_KEY if ROUTER_API_KEY else "sk-dummy"
 
         async def execute_with_semaphore(task: Task) -> AgentResult:
             async with self._semaphore:
-                worker = AgentWorker(
-                    task=task,
-                    client=self.router_engine.client,
-                    telemetry_cb=telemetry_cb or self.telemetry_cb,
+                # Per-agent httpx client to avoid connection pool serialization
+                http_client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(TASK_TIMEOUT_SECONDS, connect=10.0),
+                    limits=httpx.Limits(
+                        max_connections=20,
+                        max_keepalive_connections=10,
+                        keepalive_expiry=30,
+                    ),
                 )
-                result = await worker.run()
-                self.aggregator.add_result(result)
-                return result
+                client = AsyncOpenAI(
+                    base_url=ROUTER_BASE_URL,
+                    api_key=api_key,
+                    timeout=TASK_TIMEOUT_SECONDS,
+                    max_retries=0,
+                    http_client=http_client,
+                )
+                try:
+                    worker = AgentWorker(
+                        task=task,
+                        client=client,
+                        telemetry_cb=telemetry_cb or self.telemetry_cb,
+                    )
+                    result = await worker.run()
+                    self.aggregator.add_result(result)
+                    return result
+                finally:
+                    await http_client.aclose()
 
         # Create all tasks
         coros = [execute_with_semaphore(task) for task in tasks]

@@ -63,36 +63,27 @@ class NineRouterCoordinator:
         available_models = ", ".join(AGENT_MODEL_MAP.values())
         agent_types = [t.value for t in AgentType]
 
-        system_instruction = f"""You are an AI Task Coordinator. Your ONLY job is to decompose tasks into EXACTLY {agent_count} parallel sub-tasks.
+        system_instruction = f"""You are an AI Task Coordinator. Decompose tasks into EXACTLY {agent_count} parallel sub-tasks.
 
-RULES:
-- Output ONLY a valid JSON array with EXACTLY {agent_count} items. Nothing else.
-- No markdown, no explanation, no preamble, no conversation.
-- Start with [ and end with ]. Nothing else.
-- You MUST output exactly {agent_count} items — not more, not less.
+OUTPUT: ONLY a JSON array with EXACTLY {agent_count} items. Nothing else. No markdown, no explanation.
 
-AVAILABLE AGENT TYPES (pick from these):
-- coding, debugging, researching, analyzing, architecture, writing, translating, simple
+AGENT TYPES: coding, debugging, researching, analyzing, architecture, writing, translating, simple
+ALL models: "murah" (fast). Use "power" ONLY for architecture on genuinely complex systems.
 
-AVAILABLE MODELS: murah (fast/cheap), power (slow/strong - use ONLY for architecture when deep system design needed)
+DECISION RULE:
+- SIMPLE QUESTION (math, facts, definitions, translations, short answers): Give ALL agents the SAME core question but ask them to answer from DIFFERENT angles using different agent types. Example for "What is 2+2?": agent 1 (coding) writes code to compute it, agent 2 (researching) explains the math, agent 3 (simple) gives direct answer, etc.
+- COMPLEX TASK (code projects, multi-file, systems, analysis): Split into non-overlapping sub-tasks, each with specific deliverables.
 
-DISTRIBUTE work across {agent_count} agents. Use DIFFERENT agent types. Each agent gets a SPECIFIC sub-task.
-
-OUTPUT FORMAT - EXACTLY {agent_count} items:
+OUTPUT FORMAT:
 [
-    {{"agent_id": 1, "task_type": "coding", "assigned_model": "murah", "instruction": "Write main.py with FastAPI endpoints..."}},
-    {{"agent_id": 2, "task_type": "testing", "assigned_model": "murah", "instruction": "Write test_main.py with pytest tests..."}},
-    ... (EXACTLY {agent_count} items total)
+    {{"agent_id": 1, "task_type": "coding", "instruction": "..."}},
+    {{"agent_id": 2, "task_type": "researching", "instruction": "..."}}
 ]
 
-INSTRUCTIONS:
-- Each instruction MUST be specific and actionable
-- Include file names, function names, specific requirements
-- coding/writing/translating/data_scientist/devops/ui_designer/sql_expert/test_writer/summarizer/debugging/security/math → "murah"
-- architecture → "power" (ONLY for complex system design)
-- Do NOT generate fewer than {agent_count} items
-
-DO NOT ask questions. Output EXACTLY {agent_count} JSON items NOW."""
+RULES:
+- Each instruction is a SELF-CONTAINED task. Agent has no context except this instruction.
+- ALL instructions use model "murah". No exceptions.
+- Output EXACTLY {agent_count} items, numbered 1 to {agent_count}."""
 
         try:
             response = await self.client.chat.completions.create(
@@ -102,7 +93,7 @@ DO NOT ask questions. Output EXACTLY {agent_count} JSON items NOW."""
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,
-                max_tokens=2048,
+                max_tokens=8192,
                 stream=False,
             )
             raw = response.choices[0].message.content

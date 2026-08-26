@@ -214,13 +214,14 @@ class TestResultAggregator:
         assert "Consensus" in result.final_output
 
     def test_best_strategy(self):
-        """Should select best result."""
+        """Should select best result (prefers coder for code tasks, concise for simple)."""
         agg = ResultAggregator(AggregationStrategy.BEST)
         agg.add_result(self._make_result(1, "coder", "Short"))
         agg.add_result(self._make_result(2, "writer", "This is a much longer and more detailed output"))
 
-        result = agg.aggregate("task-1", "Test prompt")
-        assert "much longer" in result.final_output
+        result = agg.aggregate("task-1", "Write a Python function")
+        # For code tasks, coder agent gets type_bonus, so "Short" wins
+        assert "Short" in result.final_output
 
     def test_calculate_stats(self):
         """Should calculate correct statistics."""

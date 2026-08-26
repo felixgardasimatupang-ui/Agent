@@ -100,7 +100,7 @@ class ResultAggregator:
         elif self.strategy == AggregationStrategy.VOTE:
             output = self._vote()
         elif self.strategy == AggregationStrategy.BEST:
-            output = self._best()
+            output = self._best(original_prompt)
         else:
             output = self._concatenate()
 
@@ -184,34 +184,53 @@ class ResultAggregator:
             f"{winning_result.output}"
         )
 
-    def _best(self) -> str:
+    def _best(self, original_prompt: str = "") -> str:
         """Select the best result based on heuristics."""
         successful = self.get_successful_results()
         if not successful:
             return "No successful results to aggregate."
 
+        # Detect if prompt asks for code
+        prompt_lower = original_prompt.lower()
+        wants_code = any(kw in prompt_lower for kw in [
+            "code", "function", "class", "implement", "write", "program",
+            "create", "script", "api", "endpoint", "debug", "fix", "bug",
+            "python", "javascript", "java", "rust", "go", "html", "css"
+        ])
+
         def score(r: AgentResult) -> float:
             output = r.output.strip()
             length = len(output)
 
-            # Penalize very long outputs (likely boilerplate/HTML)
-            if length > 2000:
+            # Base: concise is good
+            if length < 100:
+                length_score = 15
+            elif length < 300:
+                length_score = 10
+            elif length < 500:
                 length_score = 5
-            elif length > 500:
-                length_score = min(length / 200, 8)
+            elif length < 1000:
+                length_score = 2
             else:
-                length_score = min(length / 50, 10)
+                length_score = 0
 
-            # Reward code-containing outputs
-            has_code = 1 if '```' in output or 'def ' in output or 'import ' in output else 0
+            # For code tasks: strongly prefer code output
+            has_code = '```' in output or 'def ' in output or 'import ' in output
+            code_bonus = 10 if wants_code and has_code else 0
 
-            # Reward relevant agent types for code tasks
-            type_bonus = 2 if r.agent_type in ('coding', 'debugging', 'simple') else 0
+            # For non-code tasks: prefer direct answers (no code blocks)
+            no_code_bonus = 5 if not wants_code and not has_code and length < 200 else 0
+
+            # Agent type alignment
+            if wants_code:
+                type_bonus = 5 if r.agent_type in ('coding', 'debugging') else 1
+            else:
+                type_bonus = 5 if r.agent_type in ('simple', 'researching') else 1
 
             # Faster is better
             time_score = max(5 - r.execution_time / 10, 0)
 
-            return length_score + has_code * 3 + type_bonus + time_score
+            return length_score + code_bonus + no_code_bonus + type_bonus + time_score
 
         best = max(successful, key=score)
         return (

@@ -28,7 +28,7 @@ MODEL_EMBEDDING = "fastembed"
 # Agent type to model mapping
 # Strategy: murah (cheap/fast) for most, power (strong/slow) only for complex tasks
 AGENT_MODEL_MAP = {
-    # Core agent types
+    # All agent types → murah (fast/cheap) for speed
     "coding": MODEL_SIMPLE,
     "code": MODEL_SIMPLE,
     "debugging": MODEL_SIMPLE,
@@ -37,8 +37,8 @@ AGENT_MODEL_MAP = {
     "research": MODEL_SIMPLE,
     "analyzing": MODEL_SIMPLE,
     "analysis": MODEL_SIMPLE,
-    "architecture": MODEL_COMPLEX,
-    "architect": MODEL_COMPLEX,
+    "architecture": MODEL_SIMPLE,
+    "architect": MODEL_SIMPLE,
     "writing": MODEL_SIMPLE,
     "writer": MODEL_SIMPLE,
     "translating": MODEL_SIMPLE,
@@ -50,14 +50,15 @@ AGENT_MODEL_MAP = {
 # ============================================================================
 # Swarm Configuration
 # ============================================================================
-DEFAULT_AGENT_COUNT = 5
-MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "5"))
+DEFAULT_AGENT_COUNT = 10
+MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "10"))
 TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "30"))
+MAX_CONCURRENT_AGENTS = min(MAX_CONCURRENT_AGENTS, 8)  # cap at 8 for 9Router
 
 # Retry configuration
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "2"))
-RETRY_BASE_DELAY = float(os.environ.get("RETRY_BASE_DELAY", "0.5"))
-RETRY_MAX_DELAY = float(os.environ.get("RETRY_MAX_DELAY", "15.0"))
+RETRY_BASE_DELAY = float(os.environ.get("RETRY_BASE_DELAY", "1.0"))
+RETRY_MAX_DELAY = float(os.environ.get("RETRY_MAX_DELAY", "20.0"))
 
 # Circuit breaker configuration
 CIRCUIT_BREAKER_THRESHOLD = int(os.environ.get("CIRCUIT_BREAKER_THRESHOLD", "5"))

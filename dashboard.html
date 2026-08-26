@@ -234,7 +234,7 @@ async function runSwarm() {
     const resp = await fetch(`${API}/v1/swarm/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, strategy, agents: 5 })
+      body: JSON.stringify({ prompt, strategy, agents: 10 })
     });
     const data = await resp.json();
     if (data.task_id) {
