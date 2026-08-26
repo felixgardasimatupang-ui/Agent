@@ -68,7 +68,7 @@ ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".py", ".js", ".ts", ".json", ".csv"
 # ============================================================================
 DEFAULT_AGENT_COUNT = int(os.environ.get("DEFAULT_AGENT_COUNT", "5"))
 MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "8"))
-TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "60"))
+TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "30"))
 
 # Retry configuration
 MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "2"))

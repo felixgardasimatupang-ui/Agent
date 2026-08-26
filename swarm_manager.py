@@ -171,19 +171,19 @@ class AgentWorker:
             {"role": "system", "content": self.profile.system_prompt},
         ]
 
-        # Inject shared context from previous agents if available
+        # Inject shared context from previous agents (brief summaries only)
         if self.shared_context:
             context_parts = []
             for key, val in self.shared_context.items():
                 if key.startswith("agent_") and val.get("status") == "SUCCESS":
                     context_parts.append(
-                        f"[{val['type']} agent output]: {val['output'][:200]}"
+                        f"[{val['type']}]: {val['output'][:100]}"
                     )
             if context_parts:
                 context_str = "\n".join(context_parts)
                 messages.append({
                     "role": "system",
-                    "content": f"Previous agent outputs for context:\n{context_str}",
+                    "content": f"Prior outputs:\n{context_str}",
                 })
 
         messages.append({"role": "user", "content": self.task.instruction})
@@ -378,9 +378,15 @@ class SwarmManager:
             agent_type = task_def.get("task_type", "simple")
             model = task_def.get("assigned_model", "murah")
 
-            # Include original prompt as context for the agent
+            # Include original prompt as context for the agent (keep it short)
             original_instruction = task_def["instruction"]
-            full_instruction = f"""ORIGINAL USER REQUEST:\n\"\"\"\n{prompt}\n\"\"\"\n\nYOUR SPECIFIC TASK:\n{original_instruction}\n\nProduce the complete output directly. Do NOT ask questions or say you need to check files."""
+            # Only include first 500 chars of original prompt to avoid token bloat
+            prompt_preview = prompt[:500] + ("..." if len(prompt) > 500 else "")
+            full_instruction = f"""ORIGINAL REQUEST: {prompt_preview}
+
+YOUR TASK: {original_instruction}
+
+Output directly. No preamble, no questions. Be concise and focused."""
 
             task = self.task_queue.create_task(
                 agent_id=task_def["agent_id"],

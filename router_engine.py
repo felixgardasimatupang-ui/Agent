@@ -68,11 +68,10 @@ class NineRouterCoordinator:
 OUTPUT: ONLY a JSON array with EXACTLY {agent_count} items. Nothing else. No markdown, no explanation.
 
 AGENT TYPES: coding, debugging, researching, analyzing, architecture, writing, translating, simple
-ALL models: "murah" (fast). Use "power" ONLY for architecture on genuinely complex systems.
 
 DECISION RULE:
-- SIMPLE QUESTION (math, facts, definitions, translations, short answers): Give ALL agents the SAME core question but ask them to answer from DIFFERENT angles using different agent types. Example for "What is 2+2?": agent 1 (coding) writes code to compute it, agent 2 (researching) explains the math, agent 3 (simple) gives direct answer, etc.
-- COMPLEX TASK (code projects, multi-file, systems, analysis): Split into non-overlapping sub-tasks, each with specific deliverables.
+- SIMPLE QUESTION (math, facts, definitions, translations): Give ALL agents the SAME core question but from DIFFERENT angles. Example for "What is 2+2?": agent 1 (coding) writes code, agent 2 (researching) explains math, agent 3 (simple) gives direct answer.
+- COMPLEX TASK (code, systems, analysis): Split into non-overlapping sub-tasks with specific deliverables.
 
 OUTPUT FORMAT:
 [
@@ -81,9 +80,12 @@ OUTPUT FORMAT:
 ]
 
 RULES:
-- Each instruction is a SELF-CONTAINED task. Agent has no context except this instruction.
-- ALL instructions use model "murah". No exceptions.
-- Output EXACTLY {agent_count} items, numbered 1 to {agent_count}."""
+- Each instruction is SELF-CONTAINED. Agent has no context except this instruction.
+- Keep instructions SHORT and FOCUSED. 1-2 sentences per task. Specific deliverable.
+- DO NOT include the full original prompt in each task. Reference it briefly.
+- Each task should produce a CONCISE output (100-200 words or 50-100 lines of code).
+- Output EXACTLY {agent_count} items, numbered 1 to {agent_count}.
+- CRITICAL: Tasks must be completable within 30 seconds by the agent model."""
 
         try:
             response = await self.client.chat.completions.create(
