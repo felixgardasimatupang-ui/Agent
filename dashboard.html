@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Swarm Orchestrator — Command Center</title>
+<title>AI Swarm Orchestrator</title>
 <style>
 :root {
   --bg: #0b0f19; --surface: #111827; --border: #1f2937;
@@ -12,290 +12,316 @@
   --gray: #6b7280; --text: #e5e7eb; --muted: #9ca3af;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace; min-height: 100vh; }
-.container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; line-height: 1.5; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
 
 /* Header */
-.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
-.header h1 { font-size: 1.3em; color: var(--cyan); letter-spacing: 2px; }
-.header .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-.header .status-dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
-.header .status-dot.off { background: var(--red); box-shadow: 0 0 8px var(--red); }
-.stats-bar { display: flex; gap: 20px; font-size: 0.8em; color: var(--muted); flex-wrap: wrap; }
-.stats-bar span { display: flex; align-items: center; gap: 4px; }
-.stat-val { color: var(--cyan); font-weight: bold; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.header h1 { font-size: 1.1em; color: var(--cyan); letter-spacing: 3px; font-weight: 600; }
+.header .status { display: flex; align-items: center; gap: 6px; font-size: 0.8em; color: var(--muted); }
+.header .dot { width: 8px; height: 8px; border-radius: 50%; }
+.header .dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.header .dot.off { background: var(--red); }
+.stats { display: flex; gap: 16px; font-size: 0.75em; color: var(--muted); }
+.stats b { color: var(--cyan); }
 
-/* Input Bar */
-.input-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-.input-bar textarea { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 6px; font-family: inherit; font-size: 0.9em; resize: vertical; min-height: 60px; }
-.input-bar select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; font-family: inherit; font-size: 0.85em; min-width: 120px; }
-.input-bar button { background: var(--cyan); color: var(--bg); border: none; padding: 12px 24px; border-radius: 6px; font-family: inherit; font-weight: bold; cursor: pointer; font-size: 0.9em; transition: all 0.2s; }
-.input-bar button:hover { background: #00d4e0; transform: translateY(-1px); }
-.input-bar button:disabled { background: var(--gray); cursor: not-allowed; transform: none; }
-.input-bar button:active { transform: translateY(0); }
+/* Input */
+.input-area { margin-bottom: 24px; }
+.input-row { display: flex; gap: 10px; }
+.input-row textarea { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 14px; border-radius: 8px; font-family: inherit; font-size: 0.9em; resize: vertical; min-height: 56px; transition: border-color 0.2s; }
+.input-row textarea:focus { outline: none; border-color: var(--cyan); }
+.input-row textarea::placeholder { color: var(--gray); }
+.input-controls { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.input-controls select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-family: inherit; font-size: 0.8em; }
+.run-btn { background: var(--cyan); color: var(--bg); border: none; padding: 8px 20px; border-radius: 6px; font-family: inherit; font-weight: 600; font-size: 0.85em; cursor: pointer; transition: all 0.15s; }
+.run-btn:hover { filter: brightness(1.1); }
+.run-btn:disabled { background: var(--gray); cursor: not-allowed; }
+
+/* Prompt echo */
+.prompt-echo { background: var(--surface); border-left: 3px solid var(--cyan); padding: 10px 14px; margin-bottom: 20px; font-size: 0.85em; color: var(--muted); border-radius: 0 6px 6px 0; display: none; }
+.prompt-echo.show { display: block; }
+.prompt-echo b { color: var(--cyan); margin-right: 6px; }
+
+/* Result */
+.result { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 24px; display: none; }
+.result.show { display: block; }
+.result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.result-header h3 { font-size: 0.9em; font-weight: 600; }
+.result-header h3.ok { color: var(--green); }
+.result-header h3.err { color: var(--red); }
+.result-stats { display: flex; gap: 12px; font-size: 0.75em; color: var(--muted); }
+.result-stats span { background: rgba(255,255,255,0.04); padding: 3px 10px; border-radius: 4px; }
+.result-body { background: #0d1117; border-radius: 8px; padding: 16px; font-size: 0.85em; line-height: 1.7; white-space: pre-wrap; word-break: break-word; max-height: 500px; overflow-y: auto; border: 1px solid var(--border); }
+.result-body code { color: var(--cyan); }
+.result-body pre { margin: 0; }
+
+/* Agent breakdown */
+.breakdown { margin-top: 16px; }
+.breakdown-toggle { background: none; border: 1px solid var(--border); color: var(--muted); padding: 6px 12px; border-radius: 6px; font-family: inherit; font-size: 0.75em; cursor: pointer; transition: all 0.15s; }
+.breakdown-toggle:hover { border-color: var(--cyan); color: var(--cyan); }
+.breakdown-table { width: 100%; border-collapse: collapse; font-size: 0.78em; margin-top: 12px; }
+.breakdown-table th { text-align: left; color: var(--gray); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.9em; }
+.breakdown-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: top; }
+.breakdown-table tr:last-child td { border-bottom: none; }
+.breakdown-table .cell-task { color: var(--text); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breakdown-table .cell-type { color: var(--purple); font-size: 0.9em; font-weight: 500; }
+.breakdown-table .cell-time { color: var(--gray); white-space: nowrap; }
+.breakdown-table .cell-out { color: var(--muted); max-width: 350px; max-height: 48px; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+.breakdown-table .cell-ok { color: var(--green); }
+.breakdown-table .cell-err { color: var(--red); }
 
 /* Agent Grid */
-.section-title { color: var(--cyan); font-size: 0.85em; letter-spacing: 1px; margin: 20px 0 12px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 24px; }
-.agent-card { border: 1px solid var(--border); padding: 12px; border-radius: 8px; background: var(--surface); transition: all 0.3s ease; position: relative; overflow: hidden; }
-.agent-card .agent-id { font-size: 0.7em; color: var(--gray); margin-bottom: 4px; }
-.agent-card .agent-type { font-size: 0.85em; font-weight: bold; color: var(--text); }
-.agent-card .agent-model { font-size: 0.7em; color: var(--purple); margin-top: 4px; }
-.agent-card .agent-output { font-size: 0.75em; color: var(--muted); margin-top: 6px; max-height: 60px; overflow: hidden; text-overflow: ellipsis; }
-.agent-card .time { font-size: 0.65em; color: var(--gray); margin-top: 4px; }
+.section-label { font-size: 0.75em; letter-spacing: 2px; color: var(--gray); text-transform: uppercase; margin: 24px 0 12px; font-weight: 500; }
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin-bottom: 24px; }
+.agent-card { border: 1px solid var(--border); padding: 10px 12px; border-radius: 8px; background: var(--surface); transition: all 0.2s; }
+.agent-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.agent-card .aid { font-size: 0.65em; color: var(--gray); }
+.agent-card .atype { font-size: 0.65em; color: var(--purple); font-weight: 500; text-transform: uppercase; }
+.agent-card .task { font-size: 0.78em; color: var(--text); line-height: 1.3; max-height: 36px; overflow: hidden; text-overflow: ellipsis; }
+.agent-card .meta { font-size: 0.65em; color: var(--gray); margin-top: 4px; }
+.agent-card.IDLE { opacity: 0.5; }
+.agent-card.INITIALIZING { border-color: var(--yellow); }
+.agent-card.PROCESSING { border-color: var(--blue); animation: pulse 1.5s infinite; }
+.agent-card.COMPLETE { border-color: var(--green); }
+.agent-card.FAILED { border-color: var(--red); }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
 
-/* Status colors */
-.agent-card.IDLE { border-color: var(--border); opacity: 0.6; }
-.agent-card.INITIALIZING { border-color: var(--yellow); box-shadow: 0 0 8px rgba(234,179,8,0.2); }
-.agent-card.PROCESSING { border-color: var(--blue); box-shadow: 0 0 12px rgba(56,189,248,0.25); animation: pulse 1.5s infinite; }
-.agent-card.COMPLETE { border-color: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.15); }
-.agent-card.FAILED { border-color: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.15); }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
-
-/* Result Panel */
-.result-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 24px; min-height: 80px; display: none; }
-.result-panel.show { display: block; }
-.result-panel h3 { color: var(--green); font-size: 0.9em; margin-bottom: 10px; }
-.result-panel pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; line-height: 1.6; color: var(--text); max-height: 400px; overflow-y: auto; }
-.result-meta { display: flex; gap: 16px; font-size: 0.75em; color: var(--gray); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-
-/* Task History */
-.history-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
-.history-table th { text-align: left; color: var(--gray); font-weight: normal; padding: 8px; border-bottom: 1px solid var(--border); }
-.history-table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
-.history-table .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.85em; }
-.badge-completed { background: rgba(34,197,94,0.15); color: var(--green); }
-.badge-failed { background: rgba(239,68,68,0.15); color: var(--red); }
-.badge-running { background: rgba(56,189,248,0.15); color: var(--blue); }
+/* History */
+.hist { width: 100%; border-collapse: collapse; font-size: 0.78em; }
+.hist th { text-align: left; color: var(--gray); font-weight: 500; padding: 8px; border-bottom: 1px solid var(--border); }
+.hist td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.badge { padding: 2px 8px; border-radius: 4px; font-size: 0.85em; }
+.badge-ok { background: rgba(34,197,94,0.12); color: var(--green); }
+.badge-err { background: rgba(239,68,68,0.12); color: var(--red); }
 
 /* Logs */
-.log-panel { background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-size: 0.75em; line-height: 1.5; }
-.log-line { color: var(--muted); }
-.log-line.info { color: var(--cyan); }
-.log-line.warn { color: var(--yellow); }
-.log-line.error { color: var(--red); }
+.logs { background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 160px; overflow-y: auto; font-size: 0.72em; line-height: 1.6; font-family: 'JetBrains Mono', monospace; }
+.logs .l { color: var(--muted); }
+.logs .l.i { color: var(--cyan); }
+.logs .l.w { color: var(--yellow); }
+.logs .l.e { color: var(--red); }
 
-/* Responsive */
 @media (max-width: 768px) {
-  .agent-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-  .header { flex-direction: column; align-items: flex-start; }
-  .input-bar { flex-direction: column; }
-  .stats-bar { font-size: 0.75em; }
+  .agent-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .input-row { flex-direction: column; }
 }
 </style>
 </head>
 <body>
 <div class="container">
-  <!-- Header -->
   <div class="header">
-    <h1>&gt; AI SWARM ORCHESTRATOR <span style="color:var(--gray);font-size:0.6em">LIVE</span></h1>
-    <div class="stats-bar">
-      <span>WS <span class="status-dot ok" id="ws-dot"></span><span id="ws-status">Connected</span></span>
-      <span>Agents: <span class="stat-val" id="stat-agents">0</span></span>
-      <span>Tasks: <span class="stat-val" id="stat-tasks">0</span></span>
-      <span>Uptime: <span class="stat-val" id="stat-uptime">0s</span></span>
+    <h1>SWARM ORCHESTRATOR</h1>
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+      <div class="status"><span class="dot ok" id="ws-dot"></span><span id="ws-label">Connected</span></div>
+      <div class="stats">
+        <span>Agents <b id="s-agents">0</b></span>
+        <span>Tasks <b id="s-tasks">0</b></span>
+        <span>Up <b id="s-uptime">-</b></span>
+      </div>
     </div>
   </div>
 
-  <!-- Input -->
-  <div class="input-bar">
-    <textarea id="prompt-input" placeholder="Enter your request... (e.g., Build a REST API for todo app with auth)"></textarea>
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <select id="strategy-select">
-        <option value="best">Strategy: Best</option>
-        <option value="concatenate">Strategy: Concatenate</option>
-        <option value="vote">Strategy: Vote</option>
+  <div class="input-area">
+    <div class="input-row">
+      <textarea id="inp" placeholder="What do you need?"></textarea>
+    </div>
+    <div class="input-controls">
+      <select id="strat">
+        <option value="best">Best</option>
+        <option value="concatenate">Concatenate</option>
+        <option value="vote">Vote</option>
       </select>
-      <button id="run-btn" onclick="runSwarm()">&gt; RUN SWARM</button>
+      <button class="run-btn" id="run-btn" onclick="run()">RUN</button>
     </div>
   </div>
 
-  <!-- Result -->
-  <div class="result-panel" id="result-panel">
-    <h3 id="result-title">Result</h3>
-    <pre id="result-output"></pre>
-    <div class="result-meta">
-      <span id="result-time"></span>
-      <span id="result-agents"></span>
-      <span id="result-strategy"></span>
+  <div class="prompt-echo" id="echo"><b>></b> <span id="echo-text"></span></div>
+
+  <div class="result" id="result">
+    <div class="result-header">
+      <h3 id="r-title" class="ok">Result</h3>
+      <div class="result-stats">
+        <span id="r-time"></span>
+        <span id="r-agents"></span>
+        <span id="r-strat"></span>
+      </div>
+    </div>
+    <div class="result-body" id="r-body"></div>
+    <div class="breakdown" id="bd" style="display:none">
+      <button class="breakdown-toggle" onclick="toggleBD()">Show agent breakdown</button>
+      <table class="breakdown-table" id="bd-table" style="display:none">
+        <thead><tr><th>#</th><th>Task</th><th>Type</th><th>Time</th><th>Output</th></tr></thead>
+        <tbody id="bd-body"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- Agent Grid -->
-  <div class="section-title">Agent Matrix</div>
-  <div class="agent-grid" id="agent-grid"></div>
+  <div class="section-label">Agents</div>
+  <div class="agent-grid" id="grid"></div>
 
-  <!-- History -->
-  <div class="section-title">Recent Tasks</div>
-  <table class="history-table" id="history-table">
-    <thead><tr><th>ID</th><th>Prompt</th><th>Status</th><th>Agents</th><th>Time</th></tr></thead>
-    <tbody id="history-body"></tbody>
+  <div class="section-label">History</div>
+  <table class="hist">
+    <thead><tr><th>ID</th><th>Prompt</th><th>Status</th><th>Time</th></tr></thead>
+    <tbody id="hist-body"></tbody>
   </table>
 
-  <!-- Logs -->
-  <div class="section-title">Event Log</div>
-  <div class="log-panel" id="log-panel"></div>
+  <div class="section-label">Log</div>
+  <div class="logs" id="logs"></div>
 </div>
 
 <script>
-const API = `${location.protocol}//${location.host}`;
-let ws;
-const agentStates = {};
-let taskCount = 0;
+const API = location.origin;
+let ws, count = 0;
+const agents = {};
 
-function connectWS() {
+function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
-  ws.onopen = () => {
-    document.getElementById('ws-dot').className = 'status-dot ok';
-    document.getElementById('ws-status').textContent = 'Connected';
-    addLog('WebSocket connected', 'info');
-  };
-  ws.onclose = () => {
-    document.getElementById('ws-dot').className = 'status-dot off';
-    document.getElementById('ws-status').textContent = 'Disconnected';
-    addLog('WebSocket disconnected, reconnecting...', 'warn');
-    setTimeout(connectWS, 2000);
-  };
-  ws.onerror = () => { ws.close(); };
-  ws.onmessage = (event) => {
-    const d = JSON.parse(event.data);
-    handleEvent(d);
-  };
+  ws.onopen = () => { dot(true); log('connected', 'i'); };
+  ws.onclose = () => { dot(false); setTimeout(connect, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = e => { const d = JSON.parse(e.data); if (d.type === 'agent_update') update(d); };
 }
 
-function handleEvent(d) {
-  if (d.type === 'agent_update') {
-    updateAgent(d);
-  } else if (d.type === 'task_complete') {
-    showResult(d);
-    addLog(`Task ${d.task_id?.slice(0,8)} completed in ${d.total_time?.toFixed(1)}s`, 'info');
-  }
+function dot(ok) {
+  document.getElementById('ws-dot').className = 'dot ' + (ok ? 'ok' : 'off');
+  document.getElementById('ws-label').textContent = ok ? 'Connected' : 'Disconnected';
 }
 
-function updateAgent(d) {
-  const id = d.agent_id || d.id;
-  agentStates[id] = d;
-  renderAgents();
+function update(d) {
+  agents[d.agent_id] = d;
+  render();
 }
 
-function renderAgents() {
-  const grid = document.getElementById('agent-grid');
-  const agents = Object.values(agentStates);
-  document.getElementById('stat-agents').textContent = agents.length;
-
-  grid.innerHTML = agents.map(a => `
-    <div class="agent-card ${a.status || 'IDLE'}">
-      <div class="agent-id">#${a.agent_id || a.id}</div>
-      <div class="agent-type">${(a.agent_type || 'Unknown').toUpperCase()}</div>
-      <div class="agent-model">${a.model || ''}</div>
-      <div class="agent-output">${escapeHtml(truncate(a.output || a.details || '', 80))}</div>
-      <div class="time">${a.elapsed ? a.elapsed.toFixed(1)+'s' : ''}</div>
-    </div>
-  `).join('');
+function render() {
+  const g = document.getElementById('grid');
+  const list = Object.values(agents);
+  document.getElementById('s-agents').textContent = list.length;
+  g.innerHTML = list.map(a => {
+    const t = a.instruction || a.task || a.output || '';
+    const clean = t.replace(/ORIGINAL USER REQUEST:[\s\S]*?YOUR SPECIFIC TASK:\n?/m, '').trim();
+    const display = clean ? esc(trunc(clean, 80)) : `<span style="color:var(--gray)">${a.status||'IDLE'}</span>`;
+    return `<div class="agent-card ${a.status||'IDLE'}">
+      <div class="top"><span class="aid">#${a.agent_id}</span><span class="atype">${(a.agent_type||'').toUpperCase()}</span></div>
+      <div class="task">${display}</div>
+      <div class="meta">${a.elapsed ? a.elapsed.toFixed(1)+'s' : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 function showResult(d) {
-  const panel = document.getElementById('result-panel');
-  panel.classList.add('show');
-  document.getElementById('result-title').textContent = d.success ? '✓ Result' : '✗ No Result';
-  document.getElementById('result-output').textContent = d.final_output || 'No output';
-  document.getElementById('result-time').textContent = `Time: ${(d.total_time||0).toFixed(1)}s`;
-  document.getElementById('result-agents').textContent = `Agents: ${d.success_count||0}/${(d.success_count||0)+(d.failure_count||0)}`;
-  document.getElementById('result-strategy').textContent = `Strategy: ${d.strategy||'best'}`;
+  const p = document.getElementById('result');
+  p.classList.add('show');
+  const ok = (d.success_count||0) > 0;
+  document.getElementById('r-title').textContent = ok ? 'Result' : 'No Result';
+  document.getElementById('r-title').className = ok ? 'ok' : 'err';
+
+  // Clean the output — strip **Best Result (...)** prefix
+  let raw = d.final_output || 'No output';
+  raw = raw.replace(/^\*\*Best Result \(Agent \d+, \w+\):\*\*\n*/i, '');
+  raw = raw.replace(/^\*\*Consensus Result.*?\*\*\n*/i, '');
+  document.getElementById('r-body').textContent = raw;
+
+  document.getElementById('r-time').textContent = (d.total_time||0).toFixed(1) + 's';
+  document.getElementById('r-agents').textContent = (d.success_count||0) + '/' + ((d.success_count||0)+(d.failure_count||0));
+  document.getElementById('r-strat').textContent = d.strategy || 'best';
+
+  // Breakdown
+  const ar = d.agent_results || [];
+  if (ar.length) {
+    document.getElementById('bd').style.display = 'block';
+    document.getElementById('bd-body').innerHTML = ar.map(r => {
+      const task = (r.instruction||'').replace(/ORIGINAL USER REQUEST:[\s\S]*?YOUR SPECIFIC TASK:\n?/m, '').trim();
+      const out = r.output || r.error || '';
+      return `<tr>
+        <td class="${r.status==='SUCCESS'?'cell-ok':'cell-err'}">#${r.agent_id}</td>
+        <td class="cell-task" title="${esc(task)}">${esc(trunc(task,50))}</td>
+        <td class="cell-type">${(r.agent_type||'').toUpperCase()}</td>
+        <td class="cell-time">${r.execution_time?.toFixed(1)||'-'}s</td>
+        <td class="cell-out" title="${esc(out)}">${esc(trunc(out,100))}</td>
+      </tr>`;
+    }).join('');
+    // Update grid with final data
+    ar.forEach(r => {
+      agents[r.agent_id] = {...agents[r.agent_id], agent_type:r.agent_type, instruction:r.instruction,
+        status:r.status==='SUCCESS'?'COMPLETE':'FAILED', output:r.output, elapsed:r.execution_time};
+    });
+    render();
+  }
+
   document.getElementById('run-btn').disabled = false;
-  document.getElementById('run-btn').textContent = '> RUN SWARM';
-  taskCount++;
-  document.getElementById('stat-tasks').textContent = taskCount;
+  document.getElementById('run-btn').textContent = 'RUN';
+  count++;
+  document.getElementById('s-tasks').textContent = count;
 }
 
-async function runSwarm() {
-  const prompt = document.getElementById('prompt-input').value.trim();
-  if (!prompt) return;
-  const strategy = document.getElementById('strategy-select').value;
-  const btn = document.getElementById('run-btn');
-  btn.disabled = true;
-  btn.textContent = '> RUNNING...';
+function toggleBD() {
+  const t = document.getElementById('bd-table');
+  const b = document.querySelector('.breakdown-toggle');
+  if (t.style.display === 'none') { t.style.display = 'table'; b.textContent = 'Hide breakdown'; }
+  else { t.style.display = 'none'; b.textContent = 'Show agent breakdown'; }
+}
 
-  // Reset agent grid
-  for (const k in agentStates) delete agentStates[k];
-  renderAgents();
-  document.getElementById('result-panel').classList.remove('show');
-  addLog(`Executing: ${truncate(prompt, 60)}`, 'info');
+async function run() {
+  const prompt = document.getElementById('inp').value.trim();
+  if (!prompt) return;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true; btn.textContent = '...';
+
+  document.getElementById('echo').classList.add('show');
+  document.getElementById('echo-text').textContent = prompt;
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('bd-table').style.display = 'none';
+  for (const k in agents) delete agents[k];
+  render();
 
   try {
-    // Initialize agent cards dynamically
-    const modelData = await fetch(`${API}/v1/models`).then(r => r.json());
-    const agentTypes = modelData.data || [];
-    agentTypes.forEach((a, i) => {
-      agentStates[i+1] = { agent_id: i+1, agent_type: a.id, status: 'IDLE', model: '', output: '' };
+    const r = await fetch(`${API}/v1/swarm/execute`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt, strategy: document.getElementById('strat').value, agents: 5 })
     });
-    renderAgents();
-
-    const resp = await fetch(`${API}/v1/swarm/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, strategy, agents: 10 })
-    });
-    const data = await resp.json();
-    if (data.task_id) {
-      showResult({ ...data, strategy });
-    } else {
-      addLog(`Error: ${data.detail || 'Unknown'}`, 'error');
-      btn.disabled = false;
-      btn.textContent = '> RUN SWARM';
-    }
-  } catch (e) {
-    addLog(`Fetch error: ${e.message}`, 'error');
-    btn.disabled = false;
-    btn.textContent = '> RUN SWARM';
-  }
+    const d = await r.json();
+    if (d.task_id) showResult({...d, strategy: document.getElementById('strat').value});
+    else { log('Error: ' + (d.detail||'Unknown'), 'e'); btn.disabled=false; btn.textContent='RUN'; }
+  } catch(e) { log('Error: '+e.message, 'e'); btn.disabled=false; btn.textContent='RUN'; }
 }
 
-function addLog(msg, cls = '') {
-  const panel = document.getElementById('log-panel');
+function log(m, c='') {
+  const p = document.getElementById('logs');
   const t = new Date().toLocaleTimeString();
-  panel.innerHTML += `<div class="log-line ${cls}">[${t}] ${escapeHtml(msg)}</div>`;
-  panel.scrollTop = panel.scrollHeight;
+  p.innerHTML += `<div class="l ${c}">[${t}] ${esc(m)}</div>`;
+  p.scrollTop = p.scrollHeight;
 }
 
-function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function truncate(s, n) { return s.length > n ? s.slice(0, n) + '...' : s; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function trunc(s, n) { return s.length > n ? s.slice(0,n)+'…' : s; }
 
-// Uptime ticker
 setInterval(() => {
-  const el = document.getElementById('stat-uptime');
-  if (el.dataset.start) {
-    const s = Math.floor((Date.now() - parseInt(el.dataset.start)) / 1000);
-    const m = Math.floor(s / 60), h = Math.floor(m / 60);
-    el.textContent = h > 0 ? `${h}h${m%60}m` : m > 0 ? `${m}m${s%60}s` : `${s}s`;
+  const el = document.getElementById('s-uptime');
+  if (!el.dataset.s) {
+    fetch(`${API}/health`).then(r=>r.json()).then(d=>{ el.dataset.s = Date.now() - d.uptime_seconds*1000; }).catch(()=>{});
   } else {
-    fetch(`${API}/health`).then(r => r.json()).then(d => {
-      el.dataset.start = Date.now() - (d.uptime_seconds * 1000);
-    }).catch(() => {});
+    const s = Math.floor((Date.now()-parseInt(el.dataset.s))/1000);
+    const m = Math.floor(s/60), h = Math.floor(m/60);
+    el.textContent = h ? `${h}h${m%60}m` : m ? `${m}m${s%60}s` : `${s}s`;
   }
 }, 1000);
 
-// Load history
-async function loadHistory() {
+async function loadHist() {
   try {
     const r = await fetch(`${API}/v1/swarm/tasks`);
-    const data = await r.json();
-    const tasks = data.tasks || data || [];
-    document.getElementById('history-body').innerHTML = (tasks.slice(0,10)).map(t => `
-      <tr>
-        <td style="color:var(--gray)">${(t.task_id||'').slice(0,8)}</td>
-        <td>${escapeHtml(truncate(t.prompt||'', 40))}</td>
-        <td><span class="status-badge badge-${t.status||'running'}">${t.status||'?'}</span></td>
-        <td>${t.agent_count||'-'}</td>
-        <td>${t.total_time ? t.total_time.toFixed(1)+'s' : '-'}</td>
-      </tr>
-    `).join('');
+    const d = await r.json();
+    const t = d.tasks || d || [];
+    document.getElementById('hist-body').innerHTML = t.slice(0,8).map(x => `<tr>
+      <td style="color:var(--gray)">${(x.task_id||'').slice(0,8)}</td>
+      <td>${esc(trunc(x.prompt||'',40))}</td>
+      <td><span class="badge badge-${x.status==='completed'?'ok':'err'}">${x.status||'?'}</span></td>
+      <td style="color:var(--gray)">${x.total_time ? x.total_time.toFixed(1)+'s' : '-'}</td>
+    </tr>`).join('');
   } catch(e) {}
 }
 
-connectWS();
-loadHistory();
-setInterval(loadHistory, 15000);
+connect(); loadHist(); setInterval(loadHist, 15000);
 </script>
 </body>
 </html>

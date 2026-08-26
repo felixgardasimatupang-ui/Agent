@@ -16,6 +16,7 @@ class AgentType(Enum):
     DEBUGGER = "debugger"
     ARCHITECT = "architect"
     SIMPLE = "simple"
+    WEB_SEARCHER = "web_searcher"
 
 
 @dataclass
@@ -74,6 +75,31 @@ AGENT_PROMPTS: Dict[AgentType, str] = {
 - Start with the answer.
 - Use simple language.
 - Output only the answer.""",
+
+    AgentType.WEB_SEARCHER: """You are a web research specialist. SEARCH and SYNTHESIZE information directly.
+- Use the web_search tool to find current information.
+- Summarize findings concisely.
+- Include source URLs when available.
+- MAX 300 words. Be focused and actionable.""",
+}
+
+# Web search tool definition for agents that need it
+WEB_SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "web_search",
+        "description": "Search the web for current information on any topic",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query",
+                }
+            },
+            "required": ["query"],
+        },
+    },
 }
 
 MODEL_PREFERENCES: Dict[AgentType, str] = {
@@ -85,6 +111,7 @@ MODEL_PREFERENCES: Dict[AgentType, str] = {
     AgentType.DEBUGGER: "murah",
     AgentType.ARCHITECT: "murah",
     AgentType.SIMPLE: "murah",
+    AgentType.WEB_SEARCHER: "tavily/search",
 }
 
 
@@ -99,11 +126,13 @@ def get_agent_profile(agent_type: AgentType) -> AgentProfile:
 def classify_task_type(task_description: str) -> AgentType:
     lower = task_description.lower()
 
+    if any(kw in lower for kw in ["search", "find online", "web", "latest", "current", "news"]):
+        return AgentType.WEB_SEARCHER
     if any(kw in lower for kw in ["debug", "error", "fix", "bug", "issue", "crash"]):
         return AgentType.DEBUGGER
     if any(kw in lower for kw in ["sql", "query", "database", "schema"]):
         return AgentType.ANALYST
-    if any(kw in lower for kw in ["research", "find", "search", "investigate"]):
+    if any(kw in lower for kw in ["research", "find", "investigate"]):
         return AgentType.RESEARCHER
     if any(kw in lower for kw in ["code", "function", "class", "implement", "write", "program", "create", "endpoint"]):
         return AgentType.CODER

@@ -13,8 +13,18 @@ from agent_types import (
     get_agent_profile,
     classify_task_type,
     MODEL_PREFERENCES,
+    WEB_SEARCH_TOOL,
 )
-from config import ROUTER_BASE_URL, ROUTER_API_KEY, TASK_TIMEOUT_SECONDS, MAX_RETRIES, RETRY_BASE_DELAY
+from config import (
+    ROUTER_BASE_URL,
+    ROUTER_API_KEY,
+    TASK_TIMEOUT_SECONDS,
+    MAX_RETRIES,
+    RETRY_BASE_DELAY,
+    MODEL_FALLBACK_CHAIN,
+    NINEROUTER_URL,
+    MODEL_WEB_SEARCH,
+)
 
 # Map coordinator task_type strings to AgentType enum values
 TASK_TYPE_TO_AGENT = {
@@ -33,6 +43,9 @@ TASK_TYPE_TO_AGENT = {
     "translating": AgentType.TRANSLATOR,
     "translate": AgentType.TRANSLATOR,
     "simple": AgentType.SIMPLE,
+    "web_search": AgentType.WEB_SEARCHER,
+    "search": AgentType.WEB_SEARCHER,
+    "web_searcher": AgentType.WEB_SEARCHER,
 }
 
 
@@ -61,6 +74,7 @@ class AgentWorker:
         client: AsyncOpenAI,
         retry_config: Optional[RetryConfig] = None,
         telemetry_cb=None,
+        shared_context: Optional[Dict[str, Any]] = None,
     ):
         self.task = task
         self.client = client
@@ -69,7 +83,9 @@ class AgentWorker:
             base_delay=RETRY_BASE_DELAY,
         )
         self.telemetry_cb = telemetry_cb
+        self.shared_context = shared_context or {}
         self.profile = get_agent_profile(resolve_agent_type(task.agent_type))
+        self._tokens_used = 0
 
     async def run(self) -> AgentResult:
         """Execute the task with retry logic."""
@@ -103,8 +119,16 @@ class AgentWorker:
             )
 
             result.output = response
+            result.tokens_used = self._tokens_used
             result.status = "SUCCESS"
             result.execution_time = asyncio.get_event_loop().time() - start_time
+
+            # Store in shared context for other agents
+            self.shared_context[f"agent_{self.task.agent_id}"] = {
+                "type": self.task.agent_type,
+                "output": response[:500] if response else "",
+                "status": "SUCCESS",
+            }
 
             if self.telemetry_cb:
                 await self.telemetry_cb(
@@ -145,23 +169,130 @@ class AgentWorker:
         """Make the actual API call to the LLM."""
         messages = [
             {"role": "system", "content": self.profile.system_prompt},
-            {"role": "user", "content": self.task.instruction},
         ]
 
-        response = await self.client.chat.completions.create(
+        # Inject shared context from previous agents if available
+        if self.shared_context:
+            context_parts = []
+            for key, val in self.shared_context.items():
+                if key.startswith("agent_") and val.get("status") == "SUCCESS":
+                    context_parts.append(
+                        f"[{val['type']} agent output]: {val['output'][:200]}"
+                    )
+            if context_parts:
+                context_str = "\n".join(context_parts)
+                messages.append({
+                    "role": "system",
+                    "content": f"Previous agent outputs for context:\n{context_str}",
+                })
+
+        messages.append({"role": "user", "content": self.task.instruction})
+
+        # Add web search tool for web_searcher agents
+        tools = None
+        if self.task.agent_type in ("web_searcher", "web_search"):
+            tools = [WEB_SEARCH_TOOL]
+
+        try:
+            if tools:
+                response = await self.client.chat.completions.create(
+                    model=self.task.model,
+                    messages=messages,
+                    max_tokens=self.profile.max_tokens,
+                    temperature=self.profile.temperature,
+                    tools=tools,
+                )
+            else:
+                response = await self.client.chat.completions.create(
+                    model=self.task.model,
+                    messages=messages,
+                    max_tokens=self.profile.max_tokens,
+                    temperature=self.profile.temperature,
+                )
+        except Exception as e:
+            # Multi-provider failover: try fallback models
+            if "model" in str(e).lower() or "unavailable" in str(e).lower():
+                for fallback_model in MODEL_FALLBACK_CHAIN:
+                    if fallback_model != self.task.model:
+                        try:
+                            logger.warning(f"Falling back to {fallback_model} for agent {self.task.agent_id}")
+                            response = await self.client.chat.completions.create(
+                                model=fallback_model,
+                                messages=messages,
+                                max_tokens=self.profile.max_tokens,
+                                temperature=self.profile.temperature,
+                            )
+                            break
+                        except Exception:
+                            continue
+                else:
+                    raise
+            else:
+                raise
+
+        if response.usage:
+            self._tokens_used = response.usage.total_tokens
+            logger.debug(
+                f"Token usage: {self._tokens_used}",
+                extra={"task_id": self.task.task_id},
+            )
+
+        # Handle tool calls for web search
+        choice = response.choices[0]
+        if choice.message.tool_calls:
+            return await self._handle_tool_calls(choice.message.tool_calls, messages)
+
+        return choice.message.content
+
+    async def _handle_tool_calls(self, tool_calls, messages: list) -> str:
+        """Handle tool calls (e.g., web search) and continue conversation."""
+        import json
+        import httpx as httpx_mod
+
+        messages.append(messages[-1])  # assistant message with tool_calls
+
+        for tool_call in tool_calls:
+            func = tool_call.function
+            if func.name == "web_search":
+                args = json.loads(func.arguments)
+                query = args.get("query", "")
+
+                # Call 9Router tavily/search
+                try:
+                    async with httpx_mod.AsyncClient(timeout=15.0) as client:
+                        resp = await client.post(
+                            f"{NINEROUTER_URL}/v1/chat/completions",
+                            json={
+                                "model": MODEL_WEB_SEARCH,
+                                "messages": [{"role": "user", "content": query}],
+                            },
+                        )
+                        if resp.status_code == 200:
+                            search_result = resp.json()
+                            content = search_result.get("choices", [{}])[0].get("message", {}).get("content", "No results found.")
+                        else:
+                            content = f"Search failed: HTTP {resp.status_code}"
+                except Exception as e:
+                    content = f"Search error: {str(e)}"
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": content,
+                })
+
+        # Get final response with search results
+        final_response = await self.client.chat.completions.create(
             model=self.task.model,
             messages=messages,
             max_tokens=self.profile.max_tokens,
             temperature=self.profile.temperature,
         )
 
-        if response.usage:
-            logger.debug(
-                f"Token usage: {response.usage.total_tokens}",
-                extra={"task_id": self.task.task_id},
-            )
+        if final_response.usage:
+            self._tokens_used += final_response.usage.total_tokens
 
-        return response.choices[0].message.content
+        return final_response.choices[0].message.content
 
 
 class SwarmManager:
@@ -189,6 +320,9 @@ class SwarmManager:
             recovery_timeout=30.0,
             name="swarm_executor",
         )
+
+        # Shared context between agents (memory)
+        self._shared_context: Dict[str, Any] = {}
 
         # Semaphore for limiting concurrency
         self._semaphore = asyncio.Semaphore(max_concurrent_agents)
@@ -225,6 +359,9 @@ class SwarmManager:
 
         if not self.circuit_breaker.is_available():
             raise RuntimeError("Swarm circuit breaker is open. Service degraded.")
+
+        # Clear shared context for new swarm execution
+        self._shared_context.clear()
 
         # Step 1: Decompose and route
         try:
@@ -329,6 +466,7 @@ class SwarmManager:
                         task=task,
                         client=client,
                         telemetry_cb=telemetry_cb or self.telemetry_cb,
+                        shared_context=self._shared_context,
                     )
                     result = await worker.run()
                     self.aggregator.add_result(result)

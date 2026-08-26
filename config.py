@@ -10,7 +10,7 @@ from pathlib import Path
 # 9Router Configuration
 # ============================================================================
 NINEROUTER_URL = os.environ.get("NINEROUTER_URL", "http://localhost:20128")
-NINEROUTER_KEY = os.environ.get("NINEROUTER_KEY", "sk-e62fd80253ff2518-kyxcgd-469964b8")
+NINEROUTER_KEY = os.environ.get("NINEROUTER_KEY", "")
 
 ROUTER_BASE_URL = f"{NINEROUTER_URL}/v1"
 ROUTER_API_KEY = NINEROUTER_KEY
@@ -28,7 +28,17 @@ MODEL_EMBEDDING = "fastembed"
 # Agent type to model mapping
 # Strategy: murah (cheap/fast) for most, power (strong/slow) only for complex tasks
 AGENT_MODEL_MAP = {
-    # All agent types → murah (fast/cheap) for speed
+    # AgentType enum values (used by classify_task_type)
+    "coder": MODEL_SIMPLE,
+    "researcher": MODEL_SIMPLE,
+    "analyst": MODEL_SIMPLE,
+    "translator": MODEL_SIMPLE,
+    "writer": MODEL_SIMPLE,
+    "debugger": MODEL_SIMPLE,
+    "architect": MODEL_SIMPLE,
+    "simple": MODEL_SIMPLE,
+    "web_searcher": MODEL_WEB_SEARCH,
+    # Aliases (from LLM output / task_type field)
     "coding": MODEL_SIMPLE,
     "code": MODEL_SIMPLE,
     "debugging": MODEL_SIMPLE,
@@ -38,14 +48,20 @@ AGENT_MODEL_MAP = {
     "analyzing": MODEL_SIMPLE,
     "analysis": MODEL_SIMPLE,
     "architecture": MODEL_SIMPLE,
-    "architect": MODEL_SIMPLE,
     "writing": MODEL_SIMPLE,
-    "writer": MODEL_SIMPLE,
     "translating": MODEL_SIMPLE,
     "translate": MODEL_SIMPLE,
-    "simple": MODEL_SIMPLE,
+    "web_search": MODEL_WEB_SEARCH,
+    "search": MODEL_WEB_SEARCH,
     "default": MODEL_SIMPLE,
 }
+
+# Fallback model chain for multi-provider failover
+MODEL_FALLBACK_CHAIN = [MODEL_SIMPLE, MODEL_COMPLEX]
+
+# File upload configuration
+MAX_UPLOAD_SIZE_MB = int(os.environ.get("MAX_UPLOAD_SIZE_MB", "10"))
+ALLOWED_UPLOAD_EXTENSIONS = {".txt", ".md", ".py", ".js", ".ts", ".json", ".csv", ".log", ".yaml", ".yml", ".toml"}
 
 # ============================================================================
 # Swarm Configuration

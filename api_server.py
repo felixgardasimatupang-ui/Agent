@@ -13,7 +13,7 @@ import collections
 from typing import Optional, List, Set
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -30,6 +30,8 @@ from config import (
     LOG_LEVEL,
     JSON_LOG_FORMAT,
     LOG_FILE,
+    MAX_UPLOAD_SIZE_MB,
+    ALLOWED_UPLOAD_EXTENSIONS,
 )
 from router_engine import NineRouterCoordinator
 from swarm_manager import SwarmManager
@@ -157,18 +159,14 @@ async def rate_limit_middleware(request: Request, call_next):
         key_info = _validate_api_key(api_key)
         if not key_info:
             return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
-        # Per-key rate limit
-        rate_limit = key_info.get("rate_limit", 30)
         limiter_key = f"key:{api_key[:12]}"
     else:
         limiter_key = f"ip:{request.client.host if request.client else 'unknown'}"
-        rate_limit = 60
 
-    temp_limiter = RateLimiter(max_requests=rate_limit, window_seconds=60)
-    if not temp_limiter.is_allowed(limiter_key):
+    if not _rate_limiter.is_allowed(limiter_key):
         return JSONResponse(
             status_code=429,
-            content={"detail": f"Rate limit exceeded. Max {rate_limit} requests/min."},
+            content={"detail": "Rate limit exceeded. Max 60 requests/min."},
         )
     return await call_next(request)
 
@@ -181,6 +179,7 @@ class ExecuteRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=50000, description="Task prompt")
     agents: int = Field(default=10, ge=1, le=20, description="Number of agents")
     strategy: str = Field(default="merge", description="Aggregation strategy: concatenate, merge, vote, best")
+    files: Optional[List[dict]] = Field(default=None, description="Uploaded file contents [{name, content}]")
 
 
 class TaskResponse(BaseModel):
@@ -194,6 +193,17 @@ class TaskResponse(BaseModel):
     error: Optional[str] = None
 
 
+class AgentResultItem(BaseModel):
+    agent_id: int
+    agent_type: str
+    model: str
+    instruction: str
+    status: str
+    output: Optional[str] = None
+    error: Optional[str] = None
+    execution_time: float = 0.0
+
+
 class SwarmResult(BaseModel):
     task_id: str
     prompt: str
@@ -202,6 +212,8 @@ class SwarmResult(BaseModel):
     success_count: int = 0
     failure_count: int = 0
     total_time: float = 0.0
+    total_tokens: int = 0
+    agent_results: Optional[list] = None
 
 
 class StatsResponse(BaseModel):
@@ -283,6 +295,14 @@ async def execute_swarm(req: ExecuteRequest, request: Request):
     if not prompt:
         raise HTTPException(400, detail="Prompt cannot be empty")
 
+    # Inject file content if provided
+    if req.files:
+        file_context = "\n\n--- UPLOADED FILES ---\n"
+        for f in req.files:
+            file_context += f"\n### {f.get('name', 'unknown')}:\n{f.get('content', '')}\n"
+        file_context += "\n--- END FILES ---\n"
+        prompt = prompt + file_context
+
     strategy_map = {s.value: s for s in AggregationStrategy}
     strategy = strategy_map.get(req.strategy, AggregationStrategy.MERGE)
 
@@ -291,11 +311,9 @@ async def execute_swarm(req: ExecuteRequest, request: Request):
 
     # WebSocket broadcast callback for real-time dashboard
     async def broadcast_cb(agent_id, status, message):
-        agent_type = message.split("Model: ")[-1] if "Model: " in message else "unknown"
-        model = message.split("Model: ")[-1] if "Model: " in message else ""
         await _broadcast_agent_update(
-            agent_id=agent_id, agent_type=agent_type, status=status,
-            model=model, output=message, elapsed=0,
+            agent_id=agent_id, agent_type="", status=status,
+            model="", output=message, elapsed=0,
         )
 
     try:
@@ -312,6 +330,21 @@ async def execute_swarm(req: ExecuteRequest, request: Request):
             ),
             timeout=TASK_TIMEOUT_SECONDS * req.agents + 30,
         )
+        # Build agent results list for response
+        agent_results_data = []
+        if hasattr(result, 'agent_results'):
+            for ar in result.agent_results:
+                agent_results_data.append({
+                    "agent_id": ar.agent_id,
+                    "agent_type": ar.agent_type,
+                    "model": ar.model,
+                    "instruction": getattr(ar, 'instruction', ''),
+                    "status": ar.status,
+                    "output": ar.output[:500] if ar.output else None,
+                    "error": ar.error,
+                    "execution_time": round(ar.execution_time, 2),
+                })
+
         return SwarmResult(
             task_id=result.task_id,
             prompt=prompt,
@@ -320,6 +353,8 @@ async def execute_swarm(req: ExecuteRequest, request: Request):
             success_count=result.success_count,
             failure_count=result.failure_count,
             total_time=result.total_execution_time,
+            total_tokens=result.total_tokens,
+            agent_results=agent_results_data,
         )
     except asyncio.TimeoutError:
         logger.warning(f"Swarm execution timed out after {TASK_TIMEOUT_SECONDS * req.agents + 30}s")
@@ -454,6 +489,55 @@ async def clear_completed():
     return {"cleared": count}
 
 
+# ---------------------------------------------------------------------------
+# File Upload
+# ---------------------------------------------------------------------------
+
+@app.post("/v1/upload", tags=["Files"])
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a file for use in swarm tasks. Returns file content for prompt injection."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            400,
+            detail=f"File type '{ext}' not allowed. Allowed: {', '.join(ALLOWED_UPLOAD_EXTENSIONS)}",
+        )
+
+    content = await file.read()
+    size_mb = len(content) / (1024 * 1024)
+    if size_mb > MAX_UPLOAD_SIZE_MB:
+        raise HTTPException(400, detail=f"File too large. Max: {MAX_UPLOAD_SIZE_MB}MB")
+
+    text = content.decode("utf-8", errors="replace")
+    return {
+        "filename": file.filename,
+        "size_bytes": len(content),
+        "content": text[:50000],  # cap at 50k chars
+        "truncated": len(text) > 50000,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Token Usage Stats
+# ---------------------------------------------------------------------------
+
+@app.get("/v1/swarm/tokens", tags=["Swarm"])
+async def get_token_stats():
+    """Get token usage statistics across all swarm executions."""
+    if _swarm is None:
+        raise HTTPException(503, detail="Swarm not initialized")
+
+    stats = _swarm.aggregator.calculate_stats()
+    return {
+        "total_tokens": stats.get("total_tokens", 0),
+        "total_executions": stats.get("total", 0),
+        "avg_tokens_per_execution": (
+            stats.get("total_tokens", 0) // max(stats.get("total", 1), 1)
+        ),
+        "success_rate": stats.get("success_rate", 0),
+    }
+
+
 @app.post("/v1/keys", tags=["Admin"])
 async def create_api_key(name: str = "default"):
     """Create a new API key."""
@@ -511,16 +595,42 @@ async def stream_swarm(req: ExecuteRequest):
             strategy_map = {s.value: s for s in AggregationStrategy}
             strategy = strategy_map.get(req.strategy, AggregationStrategy.MERGE)
 
-            # Telemetry callback to stream agent updates
+            # Queue-based telemetry callback for SSE streaming
+            event_queue = asyncio.Queue()
+
             async def on_agent_event(agent_id, status, message):
-                event = {"type": "agent", "agent_id": agent_id, "status": status, "message": message}
+                await event_queue.put({
+                    "type": "agent",
+                    "agent_id": agent_id,
+                    "status": status,
+                    "message": message,
+                })
+
+            # Start swarm execution in background
+            async def run_swarm():
+                return await _swarm.execute_swarm(
+                    prompt=prompt,
+                    agent_count=req.agents,
+                    aggregation_strategy=strategy,
+                    telemetry_cb=on_agent_event,
+                )
+
+            swarm_task = asyncio.create_task(run_swarm())
+
+            # Yield events as they arrive
+            while not swarm_task.done():
+                try:
+                    event = await asyncio.wait_for(event_queue.get(), timeout=0.5)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    continue
+
+            # Drain remaining events
+            while not event_queue.empty():
+                event = event_queue.get_nowait()
                 yield f"data: {json.dumps(event)}\n\n"
 
-            result = await _swarm.execute_swarm(
-                prompt=prompt,
-                agent_count=req.agents,
-                aggregation_strategy=strategy,
-            )
+            result = await swarm_task
 
             final = {
                 "type": "complete",
@@ -529,6 +639,7 @@ async def stream_swarm(req: ExecuteRequest):
                 "success_count": result.success_count,
                 "failure_count": result.failure_count,
                 "total_time": result.total_execution_time,
+                "total_tokens": result.total_tokens,
             }
             yield f"data: {json.dumps(final)}\n\n"
 
@@ -551,8 +662,6 @@ async def stream_swarm(req: ExecuteRequest):
 # ---------------------------------------------------------------------------
 # Dashboard HTML (backward compat)
 # ---------------------------------------------------------------------------
-
-from dashboard_server import HTML_TEMPLATE, active_connections
 
 # ---------------------------------------------------------------------------
 # Dashboard HTML (backward compat)

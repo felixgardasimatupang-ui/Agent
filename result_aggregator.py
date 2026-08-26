@@ -190,47 +190,77 @@ class ResultAggregator:
         if not successful:
             return "No successful results to aggregate."
 
-        # Detect if prompt asks for code
         prompt_lower = original_prompt.lower()
-        wants_code = any(kw in prompt_lower for kw in [
-            "code", "function", "class", "implement", "write", "program",
-            "create", "script", "api", "endpoint", "debug", "fix", "bug",
-            "python", "javascript", "java", "rust", "go", "html", "css"
+
+        # Detect question type — explanation/definition vs code vs math
+        wants_explanation = any(kw in prompt_lower for kw in [
+            "apa itu", "what is", "what are", "explain", "describe",
+            "define", "tell me", "how does", "how do", "kenapa", "why",
+            "kapan", "when", "dimana", "where", "siapa", "who",
+            "perbedaan", "difference", "comparison", "versus", "vs",
         ])
+        wants_code = any(kw in prompt_lower for kw in [
+            "code", "function", "class", "implement", "write a",
+            "program", "create a", "script", "api", "endpoint",
+            "debug", "fix", "bug", "build", "make a", "buat",
+            "python", "javascript", "java", "rust", "html", "css",
+        ])
+        wants_math = any(kw in prompt_lower for kw in [
+            "calculate", "how many", "berapa", "hitung",
+            "2+2", "1+1", "sqrt", "sum", "factorial",
+        ])
+
+        # If prompt is ambiguous, use explanation mode (most general)
+        is_explanation_task = wants_explanation or (not wants_code and not wants_math)
+
+        has_code_block = '```' in r.output if False else False  # placeholder
+        has_definition = False
 
         def score(r: AgentResult) -> float:
             output = r.output.strip()
             length = len(output)
+            output_lower = output.lower()
+            has_code = '```' in output or ('def ' in output and 'import ' in output)
+            has_explanation = any(kw in output_lower for kw in [
+                "is a ", "are ", "refers to", "means ", "definition",
+                "adalah", "ialah", "yaitu", "merupakan", "can be defined",
+            ])
 
-            # Base: concise is good
-            if length < 100:
-                length_score = 15
-            elif length < 300:
-                length_score = 10
-            elif length < 500:
+            # Length scoring — prefer moderate length
+            if length < 50:
                 length_score = 5
-            elif length < 1000:
-                length_score = 2
+            elif length < 200:
+                length_score = 15
+            elif length < 500:
+                length_score = 12
+            elif length < 1500:
+                length_score = 8
+            elif length < 3000:
+                length_score = 3
             else:
                 length_score = 0
 
-            # For code tasks: strongly prefer code output
-            has_code = '```' in output or 'def ' in output or 'import ' in output
-            code_bonus = 10 if wants_code and has_code else 0
+            # === EXPLANATION tasks: prefer text explanations, penalize code ===
+            if is_explanation_task:
+                expl_bonus = 15 if has_explanation else 0
+                code_penalty = -20 if has_code else 0
+                type_bonus = 10 if r.agent_type in ('simple', 'researching', 'analysis') else 2
+                return length_score + expl_bonus + code_penalty + type_bonus
 
-            # For non-code tasks: prefer direct answers (no code blocks)
-            no_code_bonus = 5 if not wants_code and not has_code and length < 200 else 0
-
-            # Agent type alignment
+            # === CODE tasks: prefer code output ===
             if wants_code:
-                type_bonus = 5 if r.agent_type in ('coding', 'debugging') else 1
-            else:
-                type_bonus = 5 if r.agent_type in ('simple', 'researching') else 1
+                code_bonus = 15 if has_code else -10
+                type_bonus = 10 if r.agent_type in ('coding', 'debugging') else 2
+                return length_score + code_bonus + type_bonus
 
-            # Faster is better
-            time_score = max(5 - r.execution_time / 10, 0)
+            # === MATH tasks: prefer short, direct answers ===
+            if wants_math:
+                # For math, shortest correct answer wins
+                short_bonus = 10 if length < 50 else 5 if length < 200 else 0
+                type_bonus = 10 if r.agent_type in ('simple', 'coding') else 2
+                return length_score + short_bonus + type_bonus
 
-            return length_score + code_bonus + no_code_bonus + type_bonus + time_score
+            return length_score
 
         best = max(successful, key=score)
         return (
