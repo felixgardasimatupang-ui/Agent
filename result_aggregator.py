@@ -131,7 +131,7 @@ class ResultAggregator:
         return "\n\n---\n\n".join(parts)
 
     def _merge(self) -> str:
-        """Intelligent merge of results by agent type."""
+        """Intelligent merge of results by agent type with deduplication."""
         successful = self.get_successful_results()
         if not successful:
             return "No successful results to aggregate."
@@ -141,6 +141,19 @@ class ResultAggregator:
         for r in successful:
             by_type.setdefault(r.agent_type, []).append(r)
 
+        # Deduplication: remove outputs that are >80% similar
+        def is_similar(a: str, b: str) -> bool:
+            if not a or not b:
+                return False
+            # Simple word-level Jaccard similarity
+            words_a = set(a.lower().split())
+            words_b = set(b.lower().split())
+            if not words_a or not words_b:
+                return False
+            intersection = len(words_a & words_b)
+            union = len(words_a | words_b)
+            return (intersection / union) > 0.8 if union > 0 else False
+
         sections = []
         for agent_type, results in by_type.items():
             if len(results) == 1:
@@ -148,12 +161,23 @@ class ResultAggregator:
                     f"**{agent_type.title()} Output:**\n{results[0].output}"
                 )
             else:
-                combined = "\n\n".join(
-                    f"- Agent {r.agent_id}: {r.output}" for r in results
-                )
-                sections.append(
-                    f"**{agent_type.title()} Outputs ({len(results)} agents):**\n{combined}"
-                )
+                # Deduplicate: keep the longest unique output per group
+                unique_results = [results[0]]
+                for r in results[1:]:
+                    if not any(is_similar(r.output, u.output) for u in unique_results):
+                        unique_results.append(r)
+
+                if len(unique_results) == 1:
+                    sections.append(
+                        f"**{agent_type.title()} Output:**\n{unique_results[0].output}"
+                    )
+                else:
+                    combined = "\n\n".join(
+                        f"- Agent {r.agent_id}: {r.output}" for r in unique_results
+                    )
+                    sections.append(
+                        f"**{agent_type.title()} Outputs ({len(unique_results)} unique):**\n{combined}"
+                    )
 
         return "\n\n---\n\n".join(sections)
 
