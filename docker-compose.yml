@@ -1,0 +1,44 @@
+services:
+  orchestrator:
+    build: .
+    container_name: ai-swarm-orchestrator
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    environment:
+      - NINEROUTER_URL=http://host.docker.internal:20128
+      - NINEROUTER_KEY=sk-e62fd80253ff2518-kyxcgd-469964b8
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - JSON_LOG_FORMAT=${JSON_LOG_FORMAT:-false}
+      - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-10}
+      - TASK_TIMEOUT_SECONDS=${TASK_TIMEOUT_SECONDS:-60}
+    volumes:
+      - swarm_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional: 9Router on Docker (uncomment + remove extra_hosts above for full containerized deploy)
+  # Requires manual API key setup via dashboard on first run.
+  # 9router:
+  #   image: ghcr.io/decolua/9router:latest
+  #   container_name: 9router
+  #   restart: unless-stopped
+  #   ports:
+  #     - "20128:20128"
+  #   volumes:
+  #     - 9router_data:/app/data
+  #   healthcheck:
+  #     test: ["CMD", "node", "-e", "fetch('http://localhost:20128/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 20s
+
+volumes:
+  swarm_data:

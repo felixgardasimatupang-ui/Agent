@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Swarm Orchestrator — Command Center</title>
+<style>
+:root {
+  --bg: #0b0f19; --surface: #111827; --border: #1f2937;
+  --cyan: #00f0ff; --green: #22c55e; --yellow: #eab308;
+  --red: #ef4444; --blue: #38bdf8; --purple: #a78bfa;
+  --gray: #6b7280; --text: #e5e7eb; --muted: #9ca3af;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace; min-height: 100vh; }
+.container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+.header h1 { font-size: 1.3em; color: var(--cyan); letter-spacing: 2px; }
+.header .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+.header .status-dot.ok { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.header .status-dot.off { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.stats-bar { display: flex; gap: 20px; font-size: 0.8em; color: var(--muted); flex-wrap: wrap; }
+.stats-bar span { display: flex; align-items: center; gap: 4px; }
+.stat-val { color: var(--cyan); font-weight: bold; }
+
+/* Input Bar */
+.input-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.input-bar textarea { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 12px; border-radius: 6px; font-family: inherit; font-size: 0.9em; resize: vertical; min-height: 60px; }
+.input-bar select { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; font-family: inherit; font-size: 0.85em; min-width: 120px; }
+.input-bar button { background: var(--cyan); color: var(--bg); border: none; padding: 12px 24px; border-radius: 6px; font-family: inherit; font-weight: bold; cursor: pointer; font-size: 0.9em; transition: all 0.2s; }
+.input-bar button:hover { background: #00d4e0; transform: translateY(-1px); }
+.input-bar button:disabled { background: var(--gray); cursor: not-allowed; transform: none; }
+.input-bar button:active { transform: translateY(0); }
+
+/* Agent Grid */
+.section-title { color: var(--cyan); font-size: 0.85em; letter-spacing: 1px; margin: 20px 0 12px; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 24px; }
+.agent-card { border: 1px solid var(--border); padding: 12px; border-radius: 8px; background: var(--surface); transition: all 0.3s ease; position: relative; overflow: hidden; }
+.agent-card .agent-id { font-size: 0.7em; color: var(--gray); margin-bottom: 4px; }
+.agent-card .agent-type { font-size: 0.85em; font-weight: bold; color: var(--text); }
+.agent-card .agent-model { font-size: 0.7em; color: var(--purple); margin-top: 4px; }
+.agent-card .agent-output { font-size: 0.75em; color: var(--muted); margin-top: 6px; max-height: 60px; overflow: hidden; text-overflow: ellipsis; }
+.agent-card .time { font-size: 0.65em; color: var(--gray); margin-top: 4px; }
+
+/* Status colors */
+.agent-card.IDLE { border-color: var(--border); opacity: 0.6; }
+.agent-card.INITIALIZING { border-color: var(--yellow); box-shadow: 0 0 8px rgba(234,179,8,0.2); }
+.agent-card.PROCESSING { border-color: var(--blue); box-shadow: 0 0 12px rgba(56,189,248,0.25); animation: pulse 1.5s infinite; }
+.agent-card.COMPLETE { border-color: var(--green); box-shadow: 0 0 6px rgba(34,197,94,0.15); }
+.agent-card.FAILED { border-color: var(--red); box-shadow: 0 0 6px rgba(239,68,68,0.15); }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.75; } }
+
+/* Result Panel */
+.result-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 24px; min-height: 80px; display: none; }
+.result-panel.show { display: block; }
+.result-panel h3 { color: var(--green); font-size: 0.9em; margin-bottom: 10px; }
+.result-panel pre { white-space: pre-wrap; word-wrap: break-word; font-size: 0.85em; line-height: 1.6; color: var(--text); max-height: 400px; overflow-y: auto; }
+.result-meta { display: flex; gap: 16px; font-size: 0.75em; color: var(--gray); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+
+/* Task History */
+.history-table { width: 100%; border-collapse: collapse; font-size: 0.8em; }
+.history-table th { text-align: left; color: var(--gray); font-weight: normal; padding: 8px; border-bottom: 1px solid var(--border); }
+.history-table td { padding: 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+.history-table .status-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.85em; }
+.badge-completed { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge-failed { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge-running { background: rgba(56,189,248,0.15); color: var(--blue); }
+
+/* Logs */
+.log-panel { background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 12px; max-height: 200px; overflow-y: auto; font-size: 0.75em; line-height: 1.5; }
+.log-line { color: var(--muted); }
+.log-line.info { color: var(--cyan); }
+.log-line.warn { color: var(--yellow); }
+.log-line.error { color: var(--red); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .agent-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .header { flex-direction: column; align-items: flex-start; }
+  .input-bar { flex-direction: column; }
+  .stats-bar { font-size: 0.75em; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>&gt; AI SWARM ORCHESTRATOR <span style="color:var(--gray);font-size:0.6em">LIVE</span></h1>
+    <div class="stats-bar">
+      <span>WS <span class="status-dot ok" id="ws-dot"></span><span id="ws-status">Connected</span></span>
+      <span>Agents: <span class="stat-val" id="stat-agents">0</span></span>
+      <span>Tasks: <span class="stat-val" id="stat-tasks">0</span></span>
+      <span>Uptime: <span class="stat-val" id="stat-uptime">0s</span></span>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-bar">
+    <textarea id="prompt-input" placeholder="Enter your request... (e.g., Build a REST API for todo app with auth)"></textarea>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <select id="strategy-select">
+        <option value="best">Strategy: Best</option>
+        <option value="concatenate">Strategy: Concatenate</option>
+        <option value="vote">Strategy: Vote</option>
+      </select>
+      <button id="run-btn" onclick="runSwarm()">&gt; RUN SWARM</button>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-panel" id="result-panel">
+    <h3 id="result-title">Result</h3>
+    <pre id="result-output"></pre>
+    <div class="result-meta">
+      <span id="result-time"></span>
+      <span id="result-agents"></span>
+      <span id="result-strategy"></span>
+    </div>
+  </div>
+
+  <!-- Agent Grid -->
+  <div class="section-title">Agent Matrix</div>
+  <div class="agent-grid" id="agent-grid"></div>
+
+  <!-- History -->
+  <div class="section-title">Recent Tasks</div>
+  <table class="history-table" id="history-table">
+    <thead><tr><th>ID</th><th>Prompt</th><th>Status</th><th>Agents</th><th>Time</th></tr></thead>
+    <tbody id="history-body"></tbody>
+  </table>
+
+  <!-- Logs -->
+  <div class="section-title">Event Log</div>
+  <div class="log-panel" id="log-panel"></div>
+</div>
+
+<script>
+const API = `${location.protocol}//${location.host}`;
+let ws;
+const agentStates = {};
+let taskCount = 0;
+
+function connectWS() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => {
+    document.getElementById('ws-dot').className = 'status-dot ok';
+    document.getElementById('ws-status').textContent = 'Connected';
+    addLog('WebSocket connected', 'info');
+  };
+  ws.onclose = () => {
+    document.getElementById('ws-dot').className = 'status-dot off';
+    document.getElementById('ws-status').textContent = 'Disconnected';
+    addLog('WebSocket disconnected, reconnecting...', 'warn');
+    setTimeout(connectWS, 2000);
+  };
+  ws.onerror = () => { ws.close(); };
+  ws.onmessage = (event) => {
+    const d = JSON.parse(event.data);
+    handleEvent(d);
+  };
+}
+
+function handleEvent(d) {
+  if (d.type === 'agent_update') {
+    updateAgent(d);
+  } else if (d.type === 'task_complete') {
+    showResult(d);
+    addLog(`Task ${d.task_id?.slice(0,8)} completed in ${d.total_time?.toFixed(1)}s`, 'info');
+  }
+}
+
+function updateAgent(d) {
+  const id = d.agent_id || d.id;
+  agentStates[id] = d;
+  renderAgents();
+}
+
+function renderAgents() {
+  const grid = document.getElementById('agent-grid');
+  const agents = Object.values(agentStates);
+  document.getElementById('stat-agents').textContent = agents.length;
+
+  grid.innerHTML = agents.map(a => `
+    <div class="agent-card ${a.status || 'IDLE'}">
+      <div class="agent-id">#${a.agent_id || a.id}</div>
+      <div class="agent-type">${(a.agent_type || 'Unknown').toUpperCase()}</div>
+      <div class="agent-model">${a.model || ''}</div>
+      <div class="agent-output">${escapeHtml(truncate(a.output || a.details || '', 80))}</div>
+      <div class="time">${a.elapsed ? a.elapsed.toFixed(1)+'s' : ''}</div>
+    </div>
+  `).join('');
+}
+
+function showResult(d) {
+  const panel = document.getElementById('result-panel');
+  panel.classList.add('show');
+  document.getElementById('result-title').textContent = d.success ? '✓ Result' : '✗ No Result';
+  document.getElementById('result-output').textContent = d.final_output || 'No output';
+  document.getElementById('result-time').textContent = `Time: ${(d.total_time||0).toFixed(1)}s`;
+  document.getElementById('result-agents').textContent = `Agents: ${d.success_count||0}/${(d.success_count||0)+(d.failure_count||0)}`;
+  document.getElementById('result-strategy').textContent = `Strategy: ${d.strategy||'best'}`;
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('run-btn').textContent = '> RUN SWARM';
+  taskCount++;
+  document.getElementById('stat-tasks').textContent = taskCount;
+}
+
+async function runSwarm() {
+  const prompt = document.getElementById('prompt-input').value.trim();
+  if (!prompt) return;
+  const strategy = document.getElementById('strategy-select').value;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '> RUNNING...';
+
+  // Reset agent grid
+  for (const k in agentStates) delete agentStates[k];
+  renderAgents();
+  document.getElementById('result-panel').classList.remove('show');
+  addLog(`Executing: ${truncate(prompt, 60)}`, 'info');
+
+  try {
+    // Initialize agent cards
+    for (let i = 1; i <= 3; i++) {
+      agentStates[i] = { agent_id: i, agent_type: 'initializing', status: 'INITIALIZING', model: '', output: '' };
+    }
+    renderAgents();
+
+    const resp = await fetch(`${API}/v1/swarm/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, strategy, agent_count: 3 })
+    });
+    const data = await resp.json();
+    if (data.task_id) {
+      showResult({ ...data, strategy });
+    } else {
+      addLog(`Error: ${data.detail || 'Unknown'}`, 'error');
+      btn.disabled = false;
+      btn.textContent = '> RUN SWARM';
+    }
+  } catch (e) {
+    addLog(`Fetch error: ${e.message}`, 'error');
+    btn.disabled = false;
+    btn.textContent = '> RUN SWARM';
+  }
+}
+
+function addLog(msg, cls = '') {
+  const panel = document.getElementById('log-panel');
+  const t = new Date().toLocaleTimeString();
+  panel.innerHTML += `<div class="log-line ${cls}">[${t}] ${escapeHtml(msg)}</div>`;
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '...' : s; }
+
+// Uptime ticker
+setInterval(() => {
+  const el = document.getElementById('stat-uptime');
+  if (el.dataset.start) {
+    const s = Math.floor((Date.now() - parseInt(el.dataset.start)) / 1000);
+    const m = Math.floor(s / 60), h = Math.floor(m / 60);
+    el.textContent = h > 0 ? `${h}h${m%60}m` : m > 0 ? `${m}m${s%60}s` : `${s}s`;
+  } else {
+    fetch(`${API}/health`).then(r => r.json()).then(d => {
+      el.dataset.start = Date.now() - (d.uptime_seconds * 1000);
+    }).catch(() => {});
+  }
+}, 1000);
+
+// Load history
+async function loadHistory() {
+  try {
+    const r = await fetch(`${API}/v1/swarm/tasks`);
+    const data = await r.json();
+    const tasks = data.tasks || data || [];
+    document.getElementById('history-body').innerHTML = (tasks.slice(0,10)).map(t => `
+      <tr>
+        <td style="color:var(--gray)">${(t.task_id||'').slice(0,8)}</td>
+        <td>${escapeHtml(truncate(t.prompt||'', 40))}</td>
+        <td><span class="status-badge badge-${t.status||'running'}">${t.status||'?'}</span></td>
+        <td>${t.agent_count||'-'}</td>
+        <td>${t.total_time ? t.total_time.toFixed(1)+'s' : '-'}</td>
+      </tr>
+    `).join('');
+  } catch(e) {}
+}
+
+connectWS();
+loadHistory();
+setInterval(loadHistory, 15000);
+</script>
+</body>
+</html>
