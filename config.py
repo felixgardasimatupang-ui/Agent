@@ -28,28 +28,21 @@ MODEL_EMBEDDING = "fastembed"
 # Agent type to model mapping
 # Strategy: murah (cheap/fast) for most, power (strong/slow) only for complex tasks
 AGENT_MODEL_MAP = {
-    "web_search": MODEL_WEB_SEARCH,
-    # Coding agents → murah (fast, good enough for code gen)
+    # Core agent types
     "coding": MODEL_SIMPLE,
     "code": MODEL_SIMPLE,
-    # Debug agents → power (need reasoning)
-    "debugging": MODEL_COMPLEX,
-    "debug": MODEL_COMPLEX,
-    # Research → murah (fast)
+    "debugging": MODEL_SIMPLE,
+    "debug": MODEL_SIMPLE,
     "researching": MODEL_SIMPLE,
     "research": MODEL_SIMPLE,
-    # Analysis → murah (fast)
     "analyzing": MODEL_SIMPLE,
     "analysis": MODEL_SIMPLE,
-    # Architecture → power (need deep thinking)
     "architecture": MODEL_COMPLEX,
     "architect": MODEL_COMPLEX,
-    # Writing/translate → murah (fast)
     "writing": MODEL_SIMPLE,
     "writer": MODEL_SIMPLE,
     "translating": MODEL_SIMPLE,
     "translate": MODEL_SIMPLE,
-    # Fallbacks
     "simple": MODEL_SIMPLE,
     "default": MODEL_SIMPLE,
 }
@@ -57,14 +50,14 @@ AGENT_MODEL_MAP = {
 # ============================================================================
 # Swarm Configuration
 # ============================================================================
-DEFAULT_AGENT_COUNT = 10
-MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "10"))
-TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "60"))
+DEFAULT_AGENT_COUNT = 5
+MAX_CONCURRENT_AGENTS = int(os.environ.get("MAX_CONCURRENT_AGENTS", "5"))
+TASK_TIMEOUT_SECONDS = int(os.environ.get("TASK_TIMEOUT_SECONDS", "30"))
 
 # Retry configuration
-MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "3"))
-RETRY_BASE_DELAY = float(os.environ.get("RETRY_BASE_DELAY", "1.0"))
-RETRY_MAX_DELAY = float(os.environ.get("RETRY_MAX_DELAY", "60.0"))
+MAX_RETRIES = int(os.environ.get("MAX_RETRIES", "2"))
+RETRY_BASE_DELAY = float(os.environ.get("RETRY_BASE_DELAY", "0.5"))
+RETRY_MAX_DELAY = float(os.environ.get("RETRY_MAX_DELAY", "15.0"))
 
 # Circuit breaker configuration
 CIRCUIT_BREAKER_THRESHOLD = int(os.environ.get("CIRCUIT_BREAKER_THRESHOLD", "5"))

@@ -223,16 +223,18 @@ async function runSwarm() {
   addLog(`Executing: ${truncate(prompt, 60)}`, 'info');
 
   try {
-    // Initialize agent cards
-    for (let i = 1; i <= 3; i++) {
-      agentStates[i] = { agent_id: i, agent_type: 'initializing', status: 'INITIALIZING', model: '', output: '' };
-    }
+    // Initialize agent cards dynamically
+    const modelData = await fetch(`${API}/v1/models`).then(r => r.json());
+    const agentTypes = modelData.data || [];
+    agentTypes.forEach((a, i) => {
+      agentStates[i+1] = { agent_id: i+1, agent_type: a.id, status: 'IDLE', model: '', output: '' };
+    });
     renderAgents();
 
     const resp = await fetch(`${API}/v1/swarm/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, strategy, agent_count: 3 })
+      body: JSON.stringify({ prompt, strategy, agents: 5 })
     });
     const data = await resp.json();
     if (data.task_id) {

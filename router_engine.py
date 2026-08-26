@@ -63,31 +63,36 @@ class NineRouterCoordinator:
         available_models = ", ".join(AGENT_MODEL_MAP.values())
         agent_types = [t.value for t in AgentType]
 
-        system_instruction = f"""You are an AI Task Coordinator. Your ONLY job is to decompose tasks into parallel sub-tasks.
+        system_instruction = f"""You are an AI Task Coordinator. Your ONLY job is to decompose tasks into EXACTLY {agent_count} parallel sub-tasks.
 
 RULES:
-- Output ONLY a valid JSON array. Nothing else.
+- Output ONLY a valid JSON array with EXACTLY {agent_count} items. Nothing else.
 - No markdown, no explanation, no preamble, no conversation.
 - Start with [ and end with ]. Nothing else.
+- You MUST output exactly {agent_count} items — not more, not less.
 
-AVAILABLE AGENT TYPES: coding, debugging, researching, analyzing, architecture, writing, translating, simple
-AVAILABLE MODELS: murah (fast/cheap), power (slow/strong - use ONLY for debugging/architecture)
+AVAILABLE AGENT TYPES (pick from these):
+- coding, debugging, researching, analyzing, architecture, writing, translating, simple
 
-OUTPUT FORMAT - exactly this structure, {agent_count} items:
+AVAILABLE MODELS: murah (fast/cheap), power (slow/strong - use ONLY for architecture when deep system design needed)
+
+DISTRIBUTE work across {agent_count} agents. Use DIFFERENT agent types. Each agent gets a SPECIFIC sub-task.
+
+OUTPUT FORMAT - EXACTLY {agent_count} items:
 [
-    {{"agent_id": 1, "task_type": "coding", "assigned_model": "murah", "instruction": "Write the main.py file with FastAPI endpoints for todo CRUD operations. Include Pydantic models, error handling, and proper status codes."}},
-    {{"agent_id": 2, "task_type": "coding", "assigned_model": "murah", "instruction": "Write requirements.txt and Dockerfile for the FastAPI todo app."}},
-    {{"agent_id": 3, "task_type": "architecture", "assigned_model": "power", "instruction": "Design the project structure and data models for the todo API."}}
+    {{"agent_id": 1, "task_type": "coding", "assigned_model": "murah", "instruction": "Write main.py with FastAPI endpoints..."}},
+    {{"agent_id": 2, "task_type": "testing", "assigned_model": "murah", "instruction": "Write test_main.py with pytest tests..."}},
+    ... (EXACTLY {agent_count} items total)
 ]
 
 INSTRUCTIONS:
-- Each instruction MUST be specific and actionable — tell the agent EXACTLY what to produce
+- Each instruction MUST be specific and actionable
 - Include file names, function names, specific requirements
-- coding/writing/translating → model "murah"
-- debugging/architecture → model "power" (only when deep reasoning needed)
-- Do NOT generate vague instructions like "help with the project"
+- coding/writing/translating/data_scientist/devops/ui_designer/sql_expert/test_writer/summarizer/debugging/security/math → "murah"
+- architecture → "power" (ONLY for complex system design)
+- Do NOT generate fewer than {agent_count} items
 
-DO NOT ask questions. DO NOT explain. Output the JSON array NOW."""
+DO NOT ask questions. Output EXACTLY {agent_count} JSON items NOW."""
 
         try:
             response = await self.client.chat.completions.create(

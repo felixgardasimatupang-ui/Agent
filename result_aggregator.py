@@ -190,11 +190,28 @@ class ResultAggregator:
         if not successful:
             return "No successful results to aggregate."
 
-        # Score based on: length (completeness), execution time (efficiency)
         def score(r: AgentResult) -> float:
-            length_score = min(len(r.output) / 100, 10)  # Cap at 10
-            time_score = max(10 - r.execution_time, 0)   # Faster is better
-            return length_score + time_score
+            output = r.output.strip()
+            length = len(output)
+
+            # Penalize very long outputs (likely boilerplate/HTML)
+            if length > 2000:
+                length_score = 5
+            elif length > 500:
+                length_score = min(length / 200, 8)
+            else:
+                length_score = min(length / 50, 10)
+
+            # Reward code-containing outputs
+            has_code = 1 if '```' in output or 'def ' in output or 'import ' in output else 0
+
+            # Reward relevant agent types for code tasks
+            type_bonus = 2 if r.agent_type in ('coding', 'debugging', 'simple') else 0
+
+            # Faster is better
+            time_score = max(5 - r.execution_time / 10, 0)
+
+            return length_score + has_code * 3 + type_bonus + time_score
 
         best = max(successful, key=score)
         return (

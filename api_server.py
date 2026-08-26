@@ -179,7 +179,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 class ExecuteRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=50000, description="Task prompt")
-    agents: int = Field(default=3, ge=1, le=20, description="Number of agents")
+    agents: int = Field(default=5, ge=1, le=20, description="Number of agents")
     strategy: str = Field(default="merge", description="Aggregation strategy: concatenate, merge, vote, best")
 
 
